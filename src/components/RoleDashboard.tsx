@@ -1,6 +1,7 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { AppRole, AppUser, invokeAccountAction, supabase } from '../lib/supabase';
-import { LogOut, Plus, RefreshCw, Check, X, Copy, ExternalLink, Trash2, GripVertical } from 'lucide-react';
+import { LogOut, Plus, RefreshCw, Check, X, Copy, ExternalLink, Trash2, GripVertical, Layers, Sparkles } from 'lucide-react';
+import { LearnerJourney } from './LearnerJourney';
 
 type Company = { id: string; name: string; owner_id: string; owner_role: AppRole; status: string; created_at: string };
 type Video = { id: string; title: string; url: string; company_id: string | null };
@@ -118,6 +119,7 @@ export function RoleDashboard({ user, onLogout }: { user: AppUser; onLogout: () 
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [workspace, setWorkspace] = useState<'journey' | 'manage'>('journey');
 
   const loadData = useCallback(async () => {
     if (!supabase) return;
@@ -259,11 +261,19 @@ export function RoleDashboard({ user, onLogout }: { user: AppUser; onLogout: () 
   const publicPortfolioUrl = `${window.location.origin}${import.meta.env.BASE_URL}portfolio/${encodeURIComponent(user.username)}`;
 
   return <div className="min-h-screen bg-[#09090d] text-white">
-    <header className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 bg-black/60 px-5 py-4">
-      <div><p className="font-mono text-xs uppercase text-red-400">Painel {roleLabel}</p><h1 className="text-xl font-semibold">{user.username}</h1></div>
-      <div className="flex gap-2"><button className={buttonClass} onClick={() => void loadData()} title="Atualizar"><RefreshCw size={16} /></button><button className={buttonClass} onClick={onLogout}><LogOut size={16} /> Terminar sessão</button></div>
+    <header className="border-b border-zinc-800 bg-black/60 px-5 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div><p className="font-mono text-xs uppercase text-red-400">{workspace === 'journey' ? 'Universidade Pessoal Cibernética' : `Painel ${roleLabel}`}</p><h1 className="text-xl font-semibold">{user.username}</h1></div>
+        <div className="flex gap-2">{workspace === 'manage' && <button className={buttonClass} onClick={() => void loadData()} title="Atualizar"><RefreshCw size={16} /></button>}<button className={buttonClass} onClick={onLogout}><LogOut size={16} /> Terminar sessão</button></div>
+      </div>
+      <nav className="mt-4 flex flex-wrap gap-2">
+        <button onClick={() => setWorkspace('journey')} className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition ${workspace === 'journey' ? 'bg-red-700 text-white' : 'border border-zinc-800 text-zinc-400 hover:text-white'}`}><Sparkles size={15} /> Minha Jornada</button>
+        <button onClick={() => setWorkspace('manage')} className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition ${workspace === 'manage' ? 'bg-red-700 text-white' : 'border border-zinc-800 text-zinc-400 hover:text-white'}`}><Layers size={15} /> {user.role === 'student' ? 'Vídeos da Empresa' : 'Painel de Gestão'}</button>
+      </nav>
     </header>
     <main className="mx-auto max-w-6xl space-y-8 px-5 py-8">
+      {workspace === 'journey' && <LearnerJourney user={user} />}
+      {workspace === 'manage' && <>
       {error && <p role="alert" className="rounded-lg border border-red-700 bg-red-950 p-3 text-sm text-red-200">{error}</p>}
       {notice && <p role="status" className="rounded-lg border border-emerald-800 bg-emerald-950/50 p-3 text-sm text-emerald-200">{notice}</p>}
       {temporaryPassword && <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-700 bg-amber-950/50 p-4"><p><span className="block text-xs uppercase text-amber-300">Senha temporária, visível apenas agora</span><code className="text-lg font-bold tracking-widest">{temporaryPassword}</code></p><span className="flex gap-2"><button className={buttonClass} onClick={() => void navigator.clipboard.writeText(temporaryPassword)}><Copy size={15} /> Copiar</button><button className={buttonClass} onClick={() => setTemporaryPassword('')} aria-label="Ocultar senha temporária"><X size={15} /></button></span></div>}
@@ -313,6 +323,7 @@ export function RoleDashboard({ user, onLogout }: { user: AppUser; onLogout: () 
 
       {user.role === 'admin' && <section className="border-b border-zinc-800 pb-8"><label className={`${buttonClass} cursor-pointer`}><Plus size={15} /> Carregar imagem para o portfólio<input className="sr-only" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(event) => { uploadPortfolioImage(event.target.files?.[0]); event.currentTarget.value = ''; }} /></label><p className="mt-2 text-xs text-zinc-500">PNG, JPEG, WEBP ou GIF até 5 MB. A imagem fica pública no portfólio.</p></section>}
       <section><h2 className="mb-3 text-lg font-semibold">{user.role === 'student' ? 'Conteúdo da empresa' : 'Vídeos disponíveis'}</h2><div className="grid gap-3 md:grid-cols-2">{videos.map((video) => <article key={video.id} className="rounded-lg border border-zinc-800 p-4"><h3 className="font-semibold">{video.title}</h3><a className="mt-2 inline-block text-sm text-red-300 underline" href={video.url} target="_blank" rel="noreferrer">Abrir vídeo</a></article>)}{videos.length === 0 && <p className="text-sm text-zinc-500">Ainda não há vídeos disponíveis.</p>}</div></section>
+      </>}
     </main>
   </div>;
 }
