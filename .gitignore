@@ -34,3 +34,8 @@ diag.txt
 
 # Supabase CLI local state
 supabase/.temp/
+
+# Local secrets and CLI artifacts (never commit)
+admin_pw.txt
+boot_secret.txt
+*.sql.tmp

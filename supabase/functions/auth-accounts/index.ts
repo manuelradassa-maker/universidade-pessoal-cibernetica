@@ -1,4 +1,4 @@
-import { serviceClient, json, corsHeaders, syntheticEmail, hashRateKey, randomPassword, getCaller } from '../_shared/http.ts';
+import { serviceClient, json, corsHeaders, syntheticEmail, hashRateKey, randomPassword, getCaller, anonClient } from '../_shared/http.ts';
 
 const usernamePattern = /^[a-zA-Z0-9_.-]{3,32}$/;
 
@@ -10,7 +10,7 @@ Deno.serve(async (request) => {
   const recordAttempts = async (keys: string[], success: boolean) => {
     const results = await Promise.all(keys.map((p_key_hash) => service.rpc('record_login_attempt', { p_key_hash, p_success: success })));
     const failed = results.find((result) => result.error);
-    if (failed?.error) throw failed.error;
+    if (failed?.error) throw new Error(`record_login_attempt: ${failed.error.message}`);
   };
   try {
     const body = await request.json();
@@ -24,8 +24,8 @@ Deno.serve(async (request) => {
       const ip = request.headers.get('cf-connecting-ip') ?? request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
       const keys = await Promise.all([hashRateKey(`username:${username.toLowerCase()}`), hashRateKey(`ip:${ip}`)]);
       for (const key of keys) {
-        const { data: allowed, error } = await service.rpc('check_login_rate_limit', { p_key_hash: key });
-        if (error) throw error;
+        const { data: allowed, error: limitError } = await service.rpc('check_login_rate_limit', { p_key_hash: key });
+        if (limitError) throw new Error(`check_login_rate_limit: ${limitError.message}`);
         if (!allowed) return json({ error: 'Demasiadas tentativas. Tente novamente dentro de 15 minutos.' }, 429);
       }
 
@@ -46,7 +46,9 @@ Deno.serve(async (request) => {
         if (resetError) throw resetError;
       }
 
-      const { data: session, error: loginError } = await service.auth.signInWithPassword({
+      // Sign in as the end user, NOT as service_role: a service_role client is
+      // not a valid credential for the password grant and makes signIn fail.
+      const { data: session, error: loginError } = await anonClient().auth.signInWithPassword({
         email: syntheticEmail(account.username), password,
       });
       if (loginError || !session.session) {
@@ -131,6 +133,7 @@ Deno.serve(async (request) => {
 
     return json({ error: 'Ação desconhecida.' }, 400);
   } catch (error) {
+    console.error('auth-accounts error', error instanceof Error ? error.message : JSON.stringify(error));
     return json({ error: error instanceof Error ? error.message : 'Erro interno.' }, 400);
   }
 });

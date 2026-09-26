@@ -18,6 +18,12 @@ export const serviceClient = () => createClient(
   { auth: { autoRefreshToken: false, persistSession: false } },
 );
 
+export const anonClient = () => createClient(
+  Deno.env.get('SUPABASE_URL')!,
+  Deno.env.get('SUPABASE_ANON_KEY')!,
+  { auth: { autoRefreshToken: false, persistSession: false } },
+);
+
 export const userClient = (authorization: string) => createClient(
   Deno.env.get('SUPABASE_URL')!,
   Deno.env.get('SUPABASE_ANON_KEY')!,
