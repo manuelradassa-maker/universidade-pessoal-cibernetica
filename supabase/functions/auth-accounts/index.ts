@@ -43,24 +43,16 @@ Deno.serve(async (request) => {
       // Compare case-insensitively: codes may have been created before the
       // uppercase normalisation on insert, and the input is uppercased above.
       const { data: invite } = await service
-        .from('invite_codes').select('id, code, role, company_id, revoked_at')
+        .from('invite_codes').select('id, code, role, company_id, created_by, revoked_at')
         .ilike('code', code).is('revoked_at', null).maybeSingle();
       if (!invite) {
         await recordAttempts(keys, false);
         return json({ error: 'Código inválido, expirado ou revogado.' }, 400);
       }
 
-      // An admin code only counts if the caller also knows the shared admin
-      // password. Login refuses anything else for admins, so accepting a
-      // chosen password here would create an account nobody can sign into.
-      if (invite.role === 'admin') {
-        const sharedPassword = Deno.env.get('ADMIN_SHARED_PASSWORD');
-        if (!sharedPassword || password !== sharedPassword) {
-          await recordAttempts(keys, false);
-          return json({ error: 'Código de administrador: é preciso a senha partilhada.' }, 403);
-        }
-      }
-
+      // Admins created through a code keep the password they choose: only the
+      // bootstrap admin shares ADMIN_SHARED_PASSWORD, and the login flow
+      // honours that distinction via `created_by`.
       // A student code must still point at an approved company at signup time.
       if (invite.role === 'student') {
         const { data: company } = await service
@@ -82,7 +74,10 @@ Deno.serve(async (request) => {
 
       const { error: profileError } = await service.from('users').insert({
         id: created.user.id, username, role: invite.role,
-        created_by: null, status: 'active',
+        // Attribute the account to whoever minted the code. `created_by`
+        // being non-null is also how login tells a code-created admin apart
+        // from the bootstrap admin, so this field is load-bearing.
+        created_by: invite.created_by, status: 'active',
       });
       if (profileError) {
         await service.auth.admin.deleteUser(created.user.id);
@@ -135,20 +130,27 @@ Deno.serve(async (request) => {
       }
 
       const { data: account } = await service.from('users')
-        .select('id, username, role, status').eq('username', username.toLowerCase()).maybeSingle();
+        .select('id, username, role, status, created_by').eq('username', username.toLowerCase()).maybeSingle();
       if (!account || account.status !== 'active') {
         await recordAttempts(keys, false);
         return json({ error: 'Credenciais inválidas.' }, 401);
       }
 
       if (account.role === 'admin') {
-        const sharedPassword = Deno.env.get('ADMIN_SHARED_PASSWORD');
-        if (!sharedPassword || password !== sharedPassword) {
-          await recordAttempts(keys, false);
-          return json({ error: 'Credenciais inválidas.' }, 401);
+        // The bootstrap admin keeps sharing ADMIN_SHARED_PASSWORD. Admins
+        // created later have their own password, so the shared password must
+        // not overwrite theirs on every login. `created_by` is null only for
+        // the bootstrap admin.
+        const isBootstrapAdmin = account.created_by === null;
+        if (isBootstrapAdmin) {
+          const sharedPassword = Deno.env.get('ADMIN_SHARED_PASSWORD');
+          if (!sharedPassword || password !== sharedPassword) {
+            await recordAttempts(keys, false);
+            return json({ error: 'Credenciais inválidas.' }, 401);
+          }
+          const { error: resetError } = await service.auth.admin.updateUserById(account.id, { password: sharedPassword });
+          if (resetError) throw new Error(`reset-admin-password: ${resetError.message}`);
         }
-        const { error: resetError } = await service.auth.admin.updateUserById(account.id, { password: sharedPassword });
-        if (resetError) throw resetError;
       }
 
       // Sign in as the end user, NOT as service_role: a service_role client is

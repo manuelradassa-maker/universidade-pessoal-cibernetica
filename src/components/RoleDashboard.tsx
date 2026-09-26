@@ -61,7 +61,7 @@ export function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: AppUse
         <button type="button" onClick={() => { setMode('login'); setError(''); }} className={tabClass(mode === 'login')}>Entrar</button>
         <button type="button" onClick={() => { setMode('signup'); setError(''); }} className={tabClass(mode === 'signup')}>Criar conta</button>
       </div>
-      {mode === 'signup' && <p className="rounded-lg border border-zinc-700 bg-black/40 p-3 text-sm text-zinc-400">Tens um código de acesso? Escolhe aqui o teu username e a tua senha. <span className="text-zinc-500">Se o teu código for de <strong className="text-zinc-300">administrador</strong>, a senha é a partilhada dos admins — não a que escolheres.</span></p>}
+      {mode === 'signup' && <p className="rounded-lg border border-zinc-700 bg-black/40 p-3 text-sm text-zinc-400">Tens um código de acesso? Escolhe aqui o teu username e a tua senha.</p>}
       {error && <p role="alert" className="rounded-lg border border-red-700 bg-red-950 p-3 text-sm text-red-200">{error}</p>}
       {mode === 'signup' && <label className="block space-y-1.5 text-sm">Código de acesso<input autoComplete="off" required value={code} onChange={(event) => setCode(event.target.value.toUpperCase())} className={`${inputClass} uppercase`} /></label>}
       <label className="block space-y-1.5 text-sm">Username<input autoComplete="username" required minLength={3} maxLength={32} pattern="[a-zA-Z0-9_.-]+" value={username} onChange={(event) => setUsername(event.target.value)} className={inputClass} /></label>
