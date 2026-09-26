@@ -207,14 +207,17 @@ Deno.serve(async (request) => {
 
       // Reuse an existing active code for the same role/company/creator when
       // one exists, so a reusable code does not multiply on every click. The
-      // creator is part of the key: each admin owns their own code, and one
-      // admin must never inherit (or revoke) another admin's code. This is also
-      // how a code distinguishes one admin/company context from another.
+      // creator is part of the key for partner/student codes: each admin owns
+      // their own, and one admin must never inherit (or revoke) another one's.
+      // Admin codes are the deliberate exception: all admins share a single
+      // one, so no `created_by` filter applies to them. This is also how a
+      // code distinguishes one admin/company context from another.
       // NULL company_id must use `is`, not `eq`: PostgREST never matches NULL
       // with `eq`, which would silently break reuse for admin/partner codes.
       let reusableQuery = service
         .from('invite_codes').select('id, code')
-        .eq('role', role).eq('created_by', caller.id).is('revoked_at', null);
+        .eq('role', role).is('revoked_at', null);
+      if (role !== 'admin') reusableQuery = reusableQuery.eq('created_by', caller.id);
       reusableQuery = companyId
         ? reusableQuery.eq('company_id', companyId)
         : reusableQuery.is('company_id', null);
