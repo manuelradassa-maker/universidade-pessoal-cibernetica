@@ -173,8 +173,12 @@ Deno.serve(async (request) => {
     // Access-code management. Both admins and partners may mint codes, but only
     // for companies they actually manage (checked per action below).
     if (action === 'list-codes') {
-      const { data: codes, error: listError } = await service
-        .from('invite_codes').select('id, code, role, company_id, label, use_count, revoked_at, created_at')
+      // Partners only see the codes they created: a partner must never see
+      // another admin's code. Admins see everything.
+      let codeQuery = service
+        .from('invite_codes').select('id, code, role, company_id, label, use_count, revoked_at, created_at');
+      if (caller.role !== 'admin') codeQuery = codeQuery.eq('created_by', caller.id);
+      const { data: codes, error: listError } = await codeQuery
         .order('created_at', { ascending: false }).limit(100);
       if (listError) throw new Error(`list-codes: ${listError.message}`);
       return json({ codes: codes ?? [] });
@@ -201,13 +205,16 @@ Deno.serve(async (request) => {
         if (!manages) return json({ error: 'Empresa inválida ou sem permissão.' }, 403);
       }
 
-      // Reuse an existing active code for the same role/company when one
-      // exists, so a reusable code does not multiply on every click. NULL
-      // company_id must use `is`, not `eq`: PostgREST never matches NULL
+      // Reuse an existing active code for the same role/company/creator when
+      // one exists, so a reusable code does not multiply on every click. The
+      // creator is part of the key: each admin owns their own code, and one
+      // admin must never inherit (or revoke) another admin's code. This is also
+      // how a code distinguishes one admin/company context from another.
+      // NULL company_id must use `is`, not `eq`: PostgREST never matches NULL
       // with `eq`, which would silently break reuse for admin/partner codes.
       let reusableQuery = service
         .from('invite_codes').select('id, code')
-        .eq('role', role).is('revoked_at', null);
+        .eq('role', role).eq('created_by', caller.id).is('revoked_at', null);
       reusableQuery = companyId
         ? reusableQuery.eq('company_id', companyId)
         : reusableQuery.is('company_id', null);
