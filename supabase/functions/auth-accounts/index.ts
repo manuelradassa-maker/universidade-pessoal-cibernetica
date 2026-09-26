@@ -16,6 +16,96 @@ Deno.serve(async (request) => {
     const body = await request.json();
     const action = String(body.action ?? '');
 
+    // Redeem an access code. Public endpoint (no session yet): the code is the
+    // credential. The recipient picks their own username and password, so the
+    // admin never sees the password.
+    if (action === 'redeem-code') {
+      const code = String(body.code ?? '').trim().toUpperCase();
+      const username = String(body.username ?? '').trim().toLowerCase();
+      const password = String(body.password ?? '');
+
+      if (!/^[A-Z0-9-]{6,32}$/.test(code)) return json({ error: 'Código inválido.' }, 400);
+      if (!usernamePattern.test(username)) return json({ error: 'Username inválido.' }, 400);
+      if (password.length < 8) return json({ error: 'A senha precisa de pelo menos 8 caracteres.' }, 400);
+
+      // Rate-limit by code and by IP, reusing the login rate-limit helpers.
+      // Without this, an attacker could brute-force short codes.
+      const ip = request.headers.get('cf-connecting-ip') ?? request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+      const keys = await Promise.all([hashRateKey(`code:${code}`), hashRateKey(`ip:${ip}`)]);
+      for (const key of keys) {
+        const { data: allowed, error: limitError } = await service.rpc('check_login_rate_limit', { p_key_hash: key });
+        if (limitError) throw new Error(`check_login_rate_limit: ${limitError.message}`);
+        if (!allowed) return json({ error: 'Demasiadas tentativas. Tente novamente dentro de 15 minutos.' }, 429);
+      }
+
+      const { data: invite } = await service
+        .from('invite_codes').select('id, code, role, company_id, revoked_at')
+        .eq('code', code).is('revoked_at', null).maybeSingle();
+      if (!invite) {
+        await recordAttempts(keys, false);
+        return json({ error: 'Código inválido, expirado ou revogado.' }, 400);
+      }
+
+      // A student code must still point at an approved company at signup time.
+      if (invite.role === 'student') {
+        const { data: company } = await service
+          .from('companies').select('id, status').eq('id', invite.company_id).single();
+        if (!company || company.status !== 'approved') {
+          await recordAttempts(keys, false);
+          return json({ error: 'A empresa deste código já não está aprovada.' }, 400);
+        }
+      }
+
+      const { data: created, error: createError } = await service.auth.admin.createUser({
+        email: syntheticEmail(username), password, email_confirm: true,
+        user_metadata: { username },
+      });
+      if (createError || !created.user) {
+        await recordAttempts(keys, false);
+        return json({ error: createError?.message ?? 'Não foi possível criar a conta.' }, 400);
+      }
+
+      const { error: profileError } = await service.from('users').insert({
+        id: created.user.id, username, role: invite.role,
+        created_by: null, status: 'active',
+      });
+      if (profileError) {
+        await service.auth.admin.deleteUser(created.user.id);
+        await recordAttempts(keys, false);
+        return json({ error: profileError.code === '23505' ? 'Este username já está em uso.' : profileError.message }, 400);
+      }
+
+      if (invite.role === 'student') {
+        const { error: linkError } = await service.from('students').insert({
+          user_id: created.user.id, company_id: invite.company_id, added_by: created.user.id,
+        });
+        if (linkError) {
+          await service.from('users').delete().eq('id', created.user.id);
+          await service.auth.admin.deleteUser(created.user.id);
+          await recordAttempts(keys, false);
+          return json({ error: linkError.message }, 400);
+        }
+      }
+
+      // Count the use for visibility, but never invalidate: codes are reusable.
+      // `uses = uses + 1` is not expressible through PostgREST, so re-read and
+      // update; concurrent signups may undercount by one, which is fine for an
+      // informational counter.
+      const { data: current } = await service
+        .from('invite_codes').select('use_count').eq('id', invite.id).single();
+      await service.from('invite_codes')
+        .update({ use_count: (current?.use_count ?? 0) + 1 }).eq('id', invite.id);
+      await recordAttempts(keys, true);
+
+      const { data: session, error: signInError } = await anonClient().auth.signInWithPassword({
+        email: syntheticEmail(username), password,
+      });
+      if (signInError || !session.session) {
+        return json({ error: 'Conta criada, mas não foi possível iniciar sessão. Tente entrar.' }, 400);
+      }
+      return json({ session: session.session, user: { username, role: invite.role, status: 'active' } }, 201);
+    }
+
     if (action === 'login') {
       const username = String(body.username ?? '').trim().toLowerCase();
       const password = String(body.password ?? '');
@@ -62,6 +152,69 @@ Deno.serve(async (request) => {
     const authorization = request.headers.get('Authorization');
     if (!authorization) return json({ error: 'Autenticação obrigatória.' }, 401);
     const { caller, db } = await getCaller(authorization);
+
+    // Access-code management. Both admins and partners may mint codes, but only
+    // for companies they actually manage (checked per action below).
+    if (action === 'list-codes') {
+      const { data: codes, error: listError } = await service
+        .from('invite_codes').select('id, code, role, company_id, label, use_count, revoked_at, created_at')
+        .order('created_at', { ascending: false }).limit(100);
+      if (listError) throw new Error(`list-codes: ${listError.message}`);
+      return json({ codes: codes ?? [] });
+    }
+
+    if (action === 'create-code') {
+      const role = String(body.role ?? '');
+      const companyId = body.company_id ? String(body.company_id) : null;
+      const label = body.label ? String(body.label).slice(0, 80) : null;
+      if (!['partner', 'student'].includes(role)) return json({ error: 'Role inválido.' }, 400);
+      const roleAllowed = (caller.role === 'admin' && ['partner', 'student'].includes(role))
+        || (caller.role === 'partner' && role === 'student');
+      if (!roleAllowed) return json({ error: 'Não tem permissão para criar códigos para esta função.' }, 403);
+      if (role === 'student' && !companyId) {
+        return json({ error: 'É obrigatório escolher uma empresa aprovada.' }, 400);
+      }
+
+      if (companyId) {
+        const { data: company } = await service
+          .from('companies').select('id, owner_id, status').eq('id', companyId).single();
+        const manages = company && company.status === 'approved' && company.owner_id === caller.id;
+        if (!manages) return json({ error: 'Empresa inválida ou sem permissão.' }, 403);
+      }
+
+      // Reuse an existing active code for the same role/company when one
+      // exists, so a reusable code does not multiply on every click.
+      const { data: reusable } = await service
+        .from('invite_codes').select('id, code')
+        .eq('role', role).eq('company_id', companyId).is('revoked_at', null)
+        .order('created_at', { ascending: true }).limit(1).maybeSingle();
+      if (reusable) return json({ code: reusable.code, reused: true }, 200);
+
+      const { data: created, error: createError } = await service
+        .from('invite_codes')
+        .insert({
+          code: randomPassword().toUpperCase(),
+          role, company_id: companyId, label, created_by: caller.id,
+        })
+        .select('code').single();
+      if (createError) throw new Error(`create-code: ${createError.message}`);
+      return json({ code: created.code, reused: false }, 201);
+    }
+
+    if (action === 'revoke-code') {
+      const code = String(body.code ?? '').trim().toUpperCase();
+      const { data: target } = await service
+        .from('invite_codes').select('id, code, created_by').eq('code', code).maybeSingle();
+      if (!target) return json({ error: 'Código não encontrado.' }, 404);
+      // Admins may revoke any code; partners only the ones they created.
+      if (caller.role !== 'admin' && target.created_by !== caller.id) {
+        return json({ error: 'Não tem permissão para revogar este código.' }, 403);
+      }
+      const { error: revokeError } = await service
+        .from('invite_codes').update({ revoked_at: new Date().toISOString() }).eq('id', target.id);
+      if (revokeError) throw new Error(`revoke-code: ${revokeError.message}`);
+      return json({ code: target.code, revoked: true });
+    }
 
     if (action === 'create-account') {
       const username = String(body.username ?? '').trim().toLowerCase();

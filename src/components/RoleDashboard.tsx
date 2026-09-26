@@ -5,6 +5,7 @@ import { LogOut, Plus, RefreshCw, Check, X, Copy, ExternalLink, Trash2, GripVert
 type Company = { id: string; name: string; owner_id: string; owner_role: AppRole; status: string; created_at: string };
 type Video = { id: string; title: string; url: string; company_id: string | null };
 type ManagedUser = { id: string; username: string; role: AppRole; status: string };
+type AccessCode = { id: string; code: string; role: AppRole; company_id: string | null; label: string | null; use_count: number; revoked_at: string | null; created_at: string };
 type PortfolioBlock = { id: string; type: 'text' | 'image' | 'video' | 'links' | 'list'; title?: string; body?: string; url?: string; items?: string[] };
 
 const toEmbedUrl = (url: string): string => {
@@ -20,8 +21,10 @@ const buttonClass = 'inline-flex items-center justify-center gap-2 rounded-lg bo
 const primaryClass = 'inline-flex items-center justify-center gap-2 rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-red-600 disabled:opacity-50';
 
 export function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: AppUser) => void }) {
+  const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -31,9 +34,13 @@ export function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: AppUse
     setError('');
     try {
       if (!supabase) throw new Error('Define VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY para ativar a autenticação.');
-      const response = await invokeAccountAction<{ session: { access_token: string; refresh_token: string }; user: AppUser }>({
-        action: 'login', username, password,
-      });
+      const response = mode === 'login'
+        ? await invokeAccountAction<{ session: { access_token: string; refresh_token: string }; user: AppUser }>({
+            action: 'login', username, password,
+          })
+        : await invokeAccountAction<{ session: { access_token: string; refresh_token: string }; user: AppUser }>({
+            action: 'redeem-code', code, username, password,
+          });
       const { error: sessionError } = await supabase.auth.setSession(response.session);
       if (sessionError) throw sessionError;
       onAuthenticated(response.user);
@@ -44,13 +51,22 @@ export function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: AppUse
     }
   };
 
+  const tabClass = (active: boolean) =>
+    `flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition ${active ? 'bg-red-700 text-white' : 'text-zinc-400 hover:text-white'}`;
+
   return <main className="flex min-h-screen items-center justify-center bg-black px-4 py-8 text-white">
     <form onSubmit={submit} className="w-full max-w-md space-y-5 rounded-2xl border border-red-900 bg-[#0d0d12] p-7 shadow-2xl">
-      <div className="text-center"><p className="mb-2 font-mono text-xs uppercase text-red-400">Universidade Pessoal Cibernética</p><h1 className="text-2xl font-bold">Iniciar sessão</h1></div>
+      <div className="text-center"><p className="mb-2 font-mono text-xs uppercase text-red-400">Universidade Pessoal Cibernética</p><h1 className="text-2xl font-bold">{mode === 'login' ? 'Iniciar sessão' : 'Criar conta'}</h1></div>
+      <div className="flex gap-2 rounded-xl bg-black/40 p-1">
+        <button type="button" onClick={() => { setMode('login'); setError(''); }} className={tabClass(mode === 'login')}>Entrar</button>
+        <button type="button" onClick={() => { setMode('signup'); setError(''); }} className={tabClass(mode === 'signup')}>Criar conta</button>
+      </div>
+      {mode === 'signup' && <p className="rounded-lg border border-zinc-700 bg-black/40 p-3 text-sm text-zinc-400">Tens um código de acesso? Escolhe aqui o teu username e a tua senha.</p>}
       {error && <p role="alert" className="rounded-lg border border-red-700 bg-red-950 p-3 text-sm text-red-200">{error}</p>}
-      <label className="block space-y-1.5 text-sm">Username<input autoComplete="username" required minLength={3} maxLength={32} value={username} onChange={(event) => setUsername(event.target.value)} className={inputClass} /></label>
-      <label className="block space-y-1.5 text-sm">Password<input autoComplete="current-password" required type="password" value={password} onChange={(event) => setPassword(event.target.value)} className={inputClass} /></label>
-      <button disabled={busy} className={`${primaryClass} w-full`} type="submit">{busy ? 'A verificar...' : 'Entrar'}</button>
+      {mode === 'signup' && <label className="block space-y-1.5 text-sm">Código de acesso<input autoComplete="off" required value={code} onChange={(event) => setCode(event.target.value.toUpperCase())} className={`${inputClass} uppercase`} /></label>}
+      <label className="block space-y-1.5 text-sm">Username<input autoComplete="username" required minLength={3} maxLength={32} pattern="[a-zA-Z0-9_.-]+" value={username} onChange={(event) => setUsername(event.target.value)} className={inputClass} /></label>
+      <label className="block space-y-1.5 text-sm">Password<input autoComplete={mode === 'login' ? 'current-password' : 'new-password'} required minLength={mode === 'login' ? undefined : 8} type="password" value={password} onChange={(event) => setPassword(event.target.value)} className={inputClass} /></label>
+      <button disabled={busy} className={`${primaryClass} w-full`} type="submit">{busy ? 'A verificar...' : mode === 'login' ? 'Entrar' : 'Criar conta e entrar'}</button>
     </form>
   </main>;
 }
@@ -96,6 +112,9 @@ export function RoleDashboard({ user, onLogout }: { user: AppUser; onLogout: () 
   const [studentCompany, setStudentCompany] = useState('');
   const [temporaryPassword, setTemporaryPassword] = useState('');
   const [portfolio, setPortfolio] = useState<PortfolioBlock[]>([]);
+  const [accessCodes, setAccessCodes] = useState<AccessCode[]>([]);
+  const [codeCompany, setCodeCompany] = useState('');
+  const [codeRole, setCodeRole] = useState<'partner' | 'student'>('student');
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -134,6 +153,38 @@ export function RoleDashboard({ user, onLogout }: { user: AppUser; onLogout: () 
     catch (caught) { setError(caught instanceof Error ? caught.message : 'A operação falhou.'); }
     finally { setBusy(false); }
   };
+
+  const loadCodes = useCallback(async () => {
+    if (!supabase || user.role === 'student') return;
+    try {
+      const result = await invokeAccountAction<{ codes: AccessCode[] }>({ action: 'list-codes' });
+      setAccessCodes(result.codes || []);
+    } catch {
+      // Listing codes is best-effort: a failure here must not break the dashboard.
+    }
+  }, [user.role]);
+
+  useEffect(() => { void Promise.resolve().then(loadCodes); }, [loadCodes]);
+
+  const createCode = (event: FormEvent) => {
+    event.preventDefault();
+    void run(async () => {
+      const result = await invokeAccountAction<{ code: string; reused: boolean }>({
+        action: 'create-code', role: codeRole,
+        company_id: codeRole === 'student' ? codeCompany : undefined,
+      });
+      await loadCodes();
+      setNotice(result.reused
+        ? `Código existente reutilizado: ${result.code}`
+        : `Código criado: ${result.code} — entrega à pessoa. Ela escolhe username e senha.`);
+    });
+  };
+
+  const revokeCode = (code: string) => void run(async () => {
+    await invokeAccountAction({ action: 'revoke-code', code });
+    await loadCodes();
+    setNotice(`Código ${code} revogado. Já não cria contas.`);
+  });
 
   const createCompany = (event: FormEvent) => {
     event.preventDefault();
@@ -225,6 +276,31 @@ export function RoleDashboard({ user, onLogout }: { user: AppUser; onLogout: () 
       {user.role === 'admin' && <section className="grid gap-8 border-b border-zinc-800 pb-8 lg:grid-cols-2">
         <form onSubmit={createVideo} className="space-y-3"><h2 className="text-lg font-semibold">Publicar vídeo</h2><input required className={inputClass} placeholder="Título" value={videoTitle} onChange={(event) => setVideoTitle(event.target.value)} /><input required type="url" className={inputClass} placeholder="https://..." value={videoUrl} onChange={(event) => setVideoUrl(event.target.value)} /><select className={inputClass} value={videoCompany} onChange={(event) => setVideoCompany(event.target.value)}><option value="">Conteúdo geral</option>{ownedApprovedCompanies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}</select><button className={primaryClass} disabled={busy}><Plus size={16} /> Publicar</button></form>
         <form onSubmit={createAccount} className="space-y-3"><h2 className="text-lg font-semibold">Criar conta</h2><select className={inputClass} value={newRole} onChange={(event) => setNewRole(event.target.value as 'partner' | 'student')}><option value="partner">Partner</option><option value="student">Student</option></select><input required minLength={3} maxLength={32} pattern="[a-zA-Z0-9_.-]+" className={inputClass} placeholder="Username" value={newUsername} onChange={(event) => setNewUsername(event.target.value)} />{newRole === 'student' && <select required className={inputClass} value={studentCompany} onChange={(event) => setStudentCompany(event.target.value)}><option value="">Escolher empresa aprovada</option>{ownedApprovedCompanies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}</select>}<button className={primaryClass} disabled={busy}><Plus size={16} /> Criar conta</button></form>
+      </section>}
+
+      {user.role !== 'student' && <section className="max-w-2xl space-y-4 border-b border-zinc-800 pb-8">
+        <div><h2 className="text-lg font-semibold">Códigos de acesso</h2><p className="text-sm text-zinc-400">Gera um código e entrega-o à pessoa. Ela entra em "Criar conta", escolhe o próprio username e senha, e fica criada com o papel e a empresa que definiste aqui. O código não se gasta: podes reutilizá-lo.</p></div>
+        <form onSubmit={createCode} className="space-y-3">
+          <select className={inputClass} value={codeRole} onChange={(event) => setCodeRole(event.target.value as 'partner' | 'student')}>
+            <option value="student">Estudante</option>
+            {user.role === 'admin' && <option value="partner">Partner</option>}
+          </select>
+          {codeRole === 'student' && <select required className={inputClass} value={codeCompany} onChange={(event) => setCodeCompany(event.target.value)}>
+            <option value="">Escolher empresa aprovada</option>
+            {ownedApprovedCompanies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}
+          </select>}
+          <button className={primaryClass} disabled={busy || (codeRole === 'student' && (!codeCompany || !ownedApprovedCompanies.length))}><Plus size={16} /> Gerar código</button>
+        </form>
+        {accessCodes.length > 0 && <div className="space-y-2">{accessCodes.map((entry) => <div key={entry.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 py-2">
+          <span className="font-mono text-sm">
+            {entry.code}
+            <span className="ml-3 text-xs uppercase text-zinc-500">{entry.role} · {entry.use_count} {entry.use_count === 1 ? 'registo' : 'registos'}{entry.revoked_at ? ' · revogado' : ''}</span>
+          </span>
+          <span className="flex gap-2">
+            <button className={buttonClass} onClick={() => void navigator.clipboard?.writeText(entry.code)}><Copy size={15} /> Copiar</button>
+            {!entry.revoked_at && <button className={buttonClass} onClick={() => revokeCode(entry.code)}><X size={15} /> Revogar</button>}
+          </span>
+        </div>)}</div>}
       </section>}
 
       {user.role === 'partner' && <section className="max-w-xl space-y-3 border-b border-zinc-800 pb-8"><h2 className="text-lg font-semibold">Adicionar estudante</h2><p className="text-sm text-zinc-400">Só é possível depois da aprovação da empresa.</p><form onSubmit={(event) => createAccount(event, 'student')} className="space-y-3"><input required minLength={3} maxLength={32} pattern="[a-zA-Z0-9_.-]+" className={inputClass} placeholder="Username" value={newUsername} onChange={(event) => setNewUsername(event.target.value)} /><select required className={inputClass} value={studentCompany} onChange={(event) => setStudentCompany(event.target.value)}><option value="">Empresa aprovada</option>{ownedApprovedCompanies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}</select><button className={primaryClass} disabled={busy || !canCreateStudent || !ownedApprovedCompanies.length}><Plus size={16} /> Criar estudante</button></form></section>}
