@@ -10,5 +10,5 @@ jobs:
     steps:
       - name: Ping Supabase
         run: |
-          curl --fail --silent --show-error --output /dev/null --write-out "HTTP %{http_code}\n" -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/" \
+          curl --fail --silent --show-error --output /dev/null --write-out "HTTP %{http_code}\n" -X GET "${{ secrets.SUPABASE_URL }}/auth/v1/health" \
             -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}"
