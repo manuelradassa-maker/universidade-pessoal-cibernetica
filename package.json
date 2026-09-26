@@ -1,0 +1,32 @@
+{
+    "name": "universidade-pessoal-cibernetica",
+    "private": true,
+    "version": "0.0.0",
+    "homepage": "https://manuelradassa-maker.github.io/universidade-pessoal-cibernetica/",
+    "type": "module",
+    "scripts": {
+        "predeploy": "npm run build",
+        "build": "tsc -b && vite build",
+        "preview": "vite preview",
+        "lint": "oxlint",
+        "dev": "vite",
+        "deploy": "gh-pages -d dist"
+    },
+    "dependencies": {
+        "@supabase/supabase-js": "^2.117.2",
+        "clsx": "^2.1.1",
+        "lucide-react": "^1.48.0",
+        "react": "^19.2.8",
+        "react-dom": "^19.2.8"
+    },
+    "devDependencies": {
+        "@types/node": "^24.13.3",
+        "@types/react": "^19.2.18",
+        "@types/react-dom": "^19.2.7",
+        "@vitejs/plugin-react": "^6.1.1",
+        "gh-pages": "^6.3.0",
+        "oxlint": "^1.81.0",
+        "typescript": "~6.0.2",
+        "vite": "^8.3.0"
+    }
+}

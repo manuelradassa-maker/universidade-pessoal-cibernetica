@@ -1,0 +1,13 @@
+project_id = "universidade-pessoal-cibernetica"
+
+[functions.auth-accounts]
+verify_jwt = false
+
+[functions.bootstrap-admin]
+verify_jwt = false
+
+[auth.email]
+enable_signup = false
+
+[auth.external.google]
+enabled = false
