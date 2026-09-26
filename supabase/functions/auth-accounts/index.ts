@@ -50,6 +50,17 @@ Deno.serve(async (request) => {
         return json({ error: 'Código inválido, expirado ou revogado.' }, 400);
       }
 
+      // An admin code only counts if the caller also knows the shared admin
+      // password. Login refuses anything else for admins, so accepting a
+      // chosen password here would create an account nobody can sign into.
+      if (invite.role === 'admin') {
+        const sharedPassword = Deno.env.get('ADMIN_SHARED_PASSWORD');
+        if (!sharedPassword || password !== sharedPassword) {
+          await recordAttempts(keys, false);
+          return json({ error: 'Código de administrador: é preciso a senha partilhada.' }, 403);
+        }
+      }
+
       // A student code must still point at an approved company at signup time.
       if (invite.role === 'student') {
         const { data: company } = await service
@@ -171,8 +182,10 @@ Deno.serve(async (request) => {
       const role = String(body.role ?? '');
       const companyId = body.company_id ? String(body.company_id) : null;
       const label = body.label ? String(body.label).slice(0, 80) : null;
-      if (!['partner', 'student'].includes(role)) return json({ error: 'Role inválido.' }, 400);
-      const roleAllowed = (caller.role === 'admin' && ['partner', 'student'].includes(role))
+      if (!['partner', 'student', 'admin'].includes(role)) return json({ error: 'Role inválido.' }, 400);
+      // Only an admin may mint admin codes: minting admin access must stay a
+      // decision taken by someone who already holds it.
+      const roleAllowed = (caller.role === 'admin')
         || (caller.role === 'partner' && role === 'student');
       if (!roleAllowed) return json({ error: 'Não tem permissão para criar códigos para esta função.' }, 403);
       if (role === 'student' && !companyId) {
@@ -187,10 +200,16 @@ Deno.serve(async (request) => {
       }
 
       // Reuse an existing active code for the same role/company when one
-      // exists, so a reusable code does not multiply on every click.
-      const { data: reusable } = await service
+      // exists, so a reusable code does not multiply on every click. NULL
+      // company_id must use `is`, not `eq`: PostgREST never matches NULL
+      // with `eq`, which would silently break reuse for admin/partner codes.
+      let reusableQuery = service
         .from('invite_codes').select('id, code')
-        .eq('role', role).eq('company_id', companyId).is('revoked_at', null)
+        .eq('role', role).is('revoked_at', null);
+      reusableQuery = companyId
+        ? reusableQuery.eq('company_id', companyId)
+        : reusableQuery.is('company_id', null);
+      const { data: reusable } = await reusableQuery
         .order('created_at', { ascending: true }).limit(1).maybeSingle();
       if (reusable) return json({ code: reusable.code, reused: true }, 200);
 

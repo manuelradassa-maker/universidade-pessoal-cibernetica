@@ -61,7 +61,7 @@ export function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: AppUse
         <button type="button" onClick={() => { setMode('login'); setError(''); }} className={tabClass(mode === 'login')}>Entrar</button>
         <button type="button" onClick={() => { setMode('signup'); setError(''); }} className={tabClass(mode === 'signup')}>Criar conta</button>
       </div>
-      {mode === 'signup' && <p className="rounded-lg border border-zinc-700 bg-black/40 p-3 text-sm text-zinc-400">Tens um código de acesso? Escolhe aqui o teu username e a tua senha.</p>}
+      {mode === 'signup' && <p className="rounded-lg border border-zinc-700 bg-black/40 p-3 text-sm text-zinc-400">Tens um código de acesso? Escolhe aqui o teu username e a tua senha. <span className="text-zinc-500">Se o teu código for de <strong className="text-zinc-300">administrador</strong>, a senha é a partilhada dos admins — não a que escolheres.</span></p>}
       {error && <p role="alert" className="rounded-lg border border-red-700 bg-red-950 p-3 text-sm text-red-200">{error}</p>}
       {mode === 'signup' && <label className="block space-y-1.5 text-sm">Código de acesso<input autoComplete="off" required value={code} onChange={(event) => setCode(event.target.value.toUpperCase())} className={`${inputClass} uppercase`} /></label>}
       <label className="block space-y-1.5 text-sm">Username<input autoComplete="username" required minLength={3} maxLength={32} pattern="[a-zA-Z0-9_.-]+" value={username} onChange={(event) => setUsername(event.target.value)} className={inputClass} /></label>
@@ -114,7 +114,7 @@ export function RoleDashboard({ user, onLogout }: { user: AppUser; onLogout: () 
   const [portfolio, setPortfolio] = useState<PortfolioBlock[]>([]);
   const [accessCodes, setAccessCodes] = useState<AccessCode[]>([]);
   const [codeCompany, setCodeCompany] = useState('');
-  const [codeRole, setCodeRole] = useState<'partner' | 'student'>('student');
+  const [codeRole, setCodeRole] = useState<'partner' | 'student' | 'admin'>('student');
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -284,7 +284,9 @@ export function RoleDashboard({ user, onLogout }: { user: AppUser; onLogout: () 
           <select className={inputClass} value={codeRole} onChange={(event) => setCodeRole(event.target.value as 'partner' | 'student')}>
             <option value="student">Estudante</option>
             {user.role === 'admin' && <option value="partner">Partner</option>}
+            {user.role === 'admin' && <option value="admin">Administrador</option>}
           </select>
+          {codeRole === 'admin' && <p className="rounded-lg border border-amber-700 bg-amber-950 p-3 text-xs text-amber-200">Um código de administrador não basta: a pessoa também tem de receber a senha partilhada dos admins. Entrega as duas.</p>}
           {codeRole === 'student' && <select required className={inputClass} value={codeCompany} onChange={(event) => setCodeCompany(event.target.value)}>
             <option value="">Escolher empresa aprovada</option>
             {ownedApprovedCompanies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}
