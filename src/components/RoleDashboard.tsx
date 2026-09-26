@@ -115,8 +115,6 @@ export function RoleDashboard({ user, onLogout }: { user: AppUser; onLogout: () 
   const [accessCodes, setAccessCodes] = useState<AccessCode[]>([]);
   const [codeCompany, setCodeCompany] = useState('');
   const [codeRole, setCodeRole] = useState<'partner' | 'student'>('student');
-  const [newAdminUsername, setNewAdminUsername] = useState('');
-  const [newAdminPassword, setNewAdminPassword] = useState('');
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -167,17 +165,6 @@ export function RoleDashboard({ user, onLogout }: { user: AppUser; onLogout: () 
   }, [user.role]);
 
   useEffect(() => { void Promise.resolve().then(loadCodes); }, [loadCodes]);
-
-  const createAdmin = (event: FormEvent) => {
-    event.preventDefault();
-    void run(async () => {
-      const result = await invokeAccountAction<{ username: string }>({
-        action: 'create-admin', username: newAdminUsername, password: newAdminPassword,
-      });
-      setNewAdminUsername(''); setNewAdminPassword('');
-      setNotice(`Administrador "${result.username}" criado. Entrega-lhe o username e a senha que definiste.`);
-    });
-  };
 
   const createCode = (event: FormEvent) => {
     event.preventDefault();
@@ -289,15 +276,6 @@ export function RoleDashboard({ user, onLogout }: { user: AppUser; onLogout: () 
       {user.role === 'admin' && <section className="grid gap-8 border-b border-zinc-800 pb-8 lg:grid-cols-2">
         <form onSubmit={createVideo} className="space-y-3"><h2 className="text-lg font-semibold">Publicar vídeo</h2><input required className={inputClass} placeholder="Título" value={videoTitle} onChange={(event) => setVideoTitle(event.target.value)} /><input required type="url" className={inputClass} placeholder="https://..." value={videoUrl} onChange={(event) => setVideoUrl(event.target.value)} /><select className={inputClass} value={videoCompany} onChange={(event) => setVideoCompany(event.target.value)}><option value="">Conteúdo geral</option>{ownedApprovedCompanies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}</select><button className={primaryClass} disabled={busy}><Plus size={16} /> Publicar</button></form>
         <form onSubmit={createAccount} className="space-y-3"><h2 className="text-lg font-semibold">Criar conta</h2><select className={inputClass} value={newRole} onChange={(event) => setNewRole(event.target.value as 'partner' | 'student')}><option value="partner">Partner</option><option value="student">Student</option></select><input required minLength={3} maxLength={32} pattern="[a-zA-Z0-9_.-]+" className={inputClass} placeholder="Username" value={newUsername} onChange={(event) => setNewUsername(event.target.value)} />{newRole === 'student' && <select required className={inputClass} value={studentCompany} onChange={(event) => setStudentCompany(event.target.value)}><option value="">Escolher empresa aprovada</option>{ownedApprovedCompanies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}</select>}<button className={primaryClass} disabled={busy}><Plus size={16} /> Criar conta</button></form>
-      </section>}
-
-      {user.role === 'admin' && <section className="max-w-2xl space-y-4 border-b border-zinc-800 pb-8">
-        <div><h2 className="text-lg font-semibold">Novo administrador</h2><p className="text-sm text-zinc-400">Define tu o username e a senha do novo admin. Não há código de acesso: só um admin existente pode criar outro, e a senha que definires é a dele, definitiva.</p></div>
-        <form onSubmit={createAdmin} className="space-y-3">
-          <input required minLength={3} maxLength={32} pattern="[a-zA-Z0-9_.-]+" className={inputClass} placeholder="Username do novo admin" autoComplete="off" value={newAdminUsername} onChange={(event) => setNewAdminUsername(event.target.value)} />
-          <input required minLength={8} type="password" className={inputClass} placeholder="Senha (mínimo 8 caracteres)" autoComplete="new-password" value={newAdminPassword} onChange={(event) => setNewAdminPassword(event.target.value)} />
-          <button className={primaryClass} disabled={busy}><Plus size={16} /> Criar administrador</button>
-        </form>
       </section>}
 
       {user.role !== 'student' && <section className="max-w-2xl space-y-4 border-b border-zinc-800 pb-8">

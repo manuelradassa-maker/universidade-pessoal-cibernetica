@@ -1,6 +1,8 @@
 import { serviceClient, json, corsHeaders, syntheticEmail, hashRateKey, randomPassword, getCaller, anonClient } from '../_shared/http.ts';
 
 const usernamePattern = /^[a-zA-Z0-9_.-]{3,32}$/;
+const accessCodePattern = /^[A-Z0-9-]{6,32}$/i;
+const normalizeAccessCode = (value: string) => String(value ?? '').trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
 
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -20,11 +22,11 @@ Deno.serve(async (request) => {
     // credential. The recipient picks their own username and password, so the
     // admin never sees the password.
     if (action === 'redeem-code') {
-      const code = String(body.code ?? '').trim().toUpperCase();
+      const code = normalizeAccessCode(String(body.code ?? ''));
       const username = String(body.username ?? '').trim().toLowerCase();
       const password = String(body.password ?? '');
 
-      if (!/^[A-Z0-9-]{6,32}$/.test(code)) return json({ error: 'Código inválido.' }, 400);
+      if (!accessCodePattern.test(code)) return json({ error: 'Código inválido.' }, 400);
       if (!usernamePattern.test(username)) return json({ error: 'Username inválido.' }, 400);
       if (password.length < 8) return json({ error: 'A senha precisa de pelo menos 8 caracteres.' }, 400);
 
@@ -38,9 +40,11 @@ Deno.serve(async (request) => {
         if (!allowed) return json({ error: 'Demasiadas tentativas. Tente novamente dentro de 15 minutos.' }, 429);
       }
 
+      // Compare case-insensitively: codes may have been created before the
+      // uppercase normalisation on insert, and the input is uppercased above.
       const { data: invite } = await service
         .from('invite_codes').select('id, code, role, company_id, revoked_at')
-        .eq('code', code).is('revoked_at', null).maybeSingle();
+        .ilike('code', code).is('revoked_at', null).maybeSingle();
       if (!invite) {
         await recordAttempts(keys, false);
         return json({ error: 'Código inválido, expirado ou revogado.' }, 400);
@@ -120,27 +124,20 @@ Deno.serve(async (request) => {
       }
 
       const { data: account } = await service.from('users')
-        .select('id, username, role, status, created_by').eq('username', username.toLowerCase()).maybeSingle();
+        .select('id, username, role, status').eq('username', username.toLowerCase()).maybeSingle();
       if (!account || account.status !== 'active') {
         await recordAttempts(keys, false);
         return json({ error: 'Credenciais inválidas.' }, 401);
       }
 
       if (account.role === 'admin') {
-        // The bootstrap admin keeps sharing ADMIN_SHARED_PASSWORD. Admins
-        // created later have their own password, so the shared password must
-        // not overwrite theirs on every login. `created_by` is null only for
-        // the bootstrap admin.
-        const isBootstrapAdmin = account.created_by === null;
-        if (isBootstrapAdmin) {
-          const sharedPassword = Deno.env.get('ADMIN_SHARED_PASSWORD');
-          if (!sharedPassword || password !== sharedPassword) {
-            await recordAttempts(keys, false);
-            return json({ error: 'Credenciais inválidas.' }, 401);
-          }
-          const { error: resetError } = await service.auth.admin.updateUserById(account.id, { password: sharedPassword });
-          if (resetError) throw new Error(`reset-admin-password: ${resetError.message}`);
+        const sharedPassword = Deno.env.get('ADMIN_SHARED_PASSWORD');
+        if (!sharedPassword || password !== sharedPassword) {
+          await recordAttempts(keys, false);
+          return json({ error: 'Credenciais inválidas.' }, 401);
         }
+        const { error: resetError } = await service.auth.admin.updateUserById(account.id, { password: sharedPassword });
+        if (resetError) throw resetError;
       }
 
       // Sign in as the end user, NOT as service_role: a service_role client is
@@ -162,46 +159,6 @@ Deno.serve(async (request) => {
 
     // Access-code management. Both admins and partners may mint codes, but only
     // for companies they actually manage (checked per action below).
-    // Provision another admin. The current admin sets both the username and
-    // the password, so the new admin never chooses their own credentials and
-    // no access code is involved. This is deliberately NOT a code redemption:
-    // minting admin access must stay a deliberate act between admins.
-    if (action === 'create-admin') {
-      const username = String(body.username ?? '').trim().toLowerCase();
-      const password = String(body.password ?? '');
-      if (caller.role !== 'admin') {
-        return json({ error: 'Só um administrador pode criar outros administradores.' }, 403);
-      }
-      if (!usernamePattern.test(username)) {
-        return json({ error: 'Username: 3 a 32 caracteres (letras, números, ponto, hífen e underscore).' }, 400);
-      }
-      if (password.length < 8) {
-        return json({ error: 'A senha precisa de pelo menos 8 caracteres.' }, 400);
-      }
-
-      // Never let an admin lock the last admin out by overwriting an existing one.
-      const { data: existing } = await service
-        .from('users').select('id, role').eq('username', username).maybeSingle();
-      if (existing) return json({ error: 'Este username já está em uso.' }, 400);
-
-      const { data: created, error: createError } = await service.auth.admin.createUser({
-        email: syntheticEmail(username), password, email_confirm: true,
-        user_metadata: { username },
-      });
-      if (createError || !created.user) {
-        return json({ error: createError?.message ?? 'Não foi possível criar a conta.' }, 400);
-      }
-
-      const { error: profileError } = await service.from('users').insert({
-        id: created.user.id, username, role: 'admin', created_by: caller.id, status: 'active',
-      });
-      if (profileError) {
-        await service.auth.admin.deleteUser(created.user.id);
-        return json({ error: profileError.message }, 400);
-      }
-      return json({ username, role: 'admin' }, 201);
-    }
-
     if (action === 'list-codes') {
       const { data: codes, error: listError } = await service
         .from('invite_codes').select('id, code, role, company_id, label, use_count, revoked_at, created_at')
@@ -249,9 +206,9 @@ Deno.serve(async (request) => {
     }
 
     if (action === 'revoke-code') {
-      const code = String(body.code ?? '').trim().toUpperCase();
+      const code = normalizeAccessCode(String(body.code ?? ''));
       const { data: target } = await service
-        .from('invite_codes').select('id, code, created_by').eq('code', code).maybeSingle();
+        .from('invite_codes').select('id, code, created_by').ilike('code', code).maybeSingle();
       if (!target) return json({ error: 'Código não encontrado.' }, 404);
       // Admins may revoke any code; partners only the ones they created.
       if (caller.role !== 'admin' && target.created_by !== caller.id) {
