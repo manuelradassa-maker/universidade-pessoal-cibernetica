@@ -49,13 +49,28 @@ export function ReaderDiagnosticModal({ user, onComplete, onDraftChange, onClose
       ? detailedText.length >= 100
       : (answers.problem ?? '').trim().length >= 15 && (answers.result ?? '').trim().length >= 20
         && !/^(quero melhorar|ser melhor|ter sucesso|evoluir|ler mais)$/i.test((answers.result ?? '').trim());
-    if ((!detailed && !answeredCore) || (detailed && (detailedText.length < 100 || !answers.detailedFormat)) || !Number.isFinite(hours) || hours <= 0 || !concretePriority) {
-      setError('Para recomendar a primeira fase, preciso de contexto, prioridade dos próximos 90 dias, disponibilidade, formato e um bloqueio atual. Se ainda não sabes, deixa o diagnóstico por concluir.');
+    const missing = detailed
+      ? [
+          detailedText.length < 100 ? 'um contexto com pelo menos 100 caracteres' : '',
+          !Number.isFinite(hours) || hours <= 0 ? 'as horas disponiveis por semana' : '',
+          !answers.detailedFormat ? 'o formato preferido' : '',
+        ].filter(Boolean)
+      : [
+          !answeredCore ? 'os campos essenciais da entrevista' : '',
+          !Number.isFinite(hours) || hours <= 0 ? 'as horas disponiveis por semana' : '',
+          !concretePriority ? 'um objetivo concreto para os proximos 90 dias' : '',
+        ].filter(Boolean);
+    if (missing.length > 0) {
+      setError(`Antes de guardar, falta preencher: ${missing.join(', ')}.`);
       return;
     }
     const evidence = detailed ? detailedText : bottleneckEvidence.trim();
-    if (!bottleneck || evidence.length < 12) {
-      setError('Escolhe o pilar que consideras mais bloqueado e descreve um exemplo recente que sustente essa hipótese.');
+    if (!bottleneck) {
+      setError('Escolhe um dos quatro pilares para identificar o gargalo que queres trabalhar.');
+      return;
+    }
+    if (evidence.length < 12) {
+      setError('Descreve uma situacao recente que sustente a hipotese de gargalo.');
       return;
     }
     const number = (key: string) => {
