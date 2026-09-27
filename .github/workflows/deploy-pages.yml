@@ -1,0 +1,66 @@
+name: Deploy Pages
+
+# O site publicado e o branch gh-pages eram actualizados a mao (commits "Updates"),
+# o que deixou o dominio a servir um bundle antigo sem o codigo do painel. Este
+# workflow elimina o passo manual: builda main e publica o resultado em gh-pages.
+# Os secrets SUPABASE_URL e SUPABASE_ANON_KEY ja existem no repositorio (sao os
+# mesmos que o keep-alive usa); a anon key e publica por design e as policies e as
+# Edge Functions continuam a guardar as credenciais verdadeiras do lado do servidor.
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'supabase/**'
+      - '.github/workflows/keep-alive.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages-deploy
+  cancel-in-progress: false
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+
+      - name: Verificar o bundle antes de publicar
+        # Sem este passo um build sem env, ou um dist velho, volta a chegar ao
+        # dominio em silencio (foi exactamente o que aconteceu com o bundle publicado).
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        run: |
+          set -euo pipefail
+          grep -rq "$SUPABASE_URL" dist/assets || { echo "::error::O bundle nao contem o URL do Supabase: as variaveis VITE_ nao chegaram ao build."; exit 1; }
+          grep -rq "Supabase não está configurado" dist/assets || { echo "::error::O bundle nao contem a mensagem de configuracao do painel autenticado."; exit 1; }
+          grep -rq "Minha Jornada" dist/assets || { echo "::error::O bundle nao contem o painel de aprendizagem."; exit 1; }
+          test -f dist/404.html || { echo "::error::dist/404.html em falta: rotas diretas como /portfolio/username partem no Pages."; exit 1; }
+          echo "Bundle verificado: configurado, com painel de aprendizagem e fallback de rotas."
+
+      - name: Publicar em gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./dist
+          force_orphan: true
+          commit_message: "deploy ${{ github.sha }}"

@@ -41,7 +41,7 @@ Autenticação por username/password com Supabase Auth, cargos `admin`, `partner
 
 Copie `.env.example` para `.env.local` e defina `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`. A anon/publishable key é pública e protegida pelas policies; nunca coloque a `service_role` key, `ADMIN_SHARED_PASSWORD` ou `ADMIN_BOOTSTRAP_SECRET` em variáveis `VITE_`.
 
-Para GitHub Pages, defina `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` como variáveis de build no workflow de publicação e volte a publicar. Os projetos Vite estáticos não leem variáveis do servidor em runtime. `public/404.html` preserva rotas diretas como `/portfolio/username` no Pages.
+Para GitHub Pages não defines nada à mão: `.github/workflows/deploy-pages.yml` faz o build com `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` lidos dos secrets `SUPABASE_URL` e `SUPABASE_ANON_KEY` do repositório e publica `dist` no branch `gh-pages` a cada push em `main`. Os projetos Vite estáticos não leem variáveis do servidor em runtime, por isso um build sem estas variáveis mostra apenas "Supabase não está configurado" — o workflow verifica o bundle antes de publicar. `public/404.html` preserva rotas diretas como `/portfolio/username` no Pages, devolvendo nesse caminho um estatuto HTTP 404. Detalhe e procedimentos de rollback em `docs/DEPLOY.md`.
 
 ## Regras implementadas
 

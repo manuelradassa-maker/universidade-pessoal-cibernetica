@@ -30,6 +30,8 @@ dist-ssr
 _*.bat
 _body.json
 diag.txt
+pdf_text.txt
+
 *.bak
 
 # Supabase CLI local state
