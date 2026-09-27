@@ -107,7 +107,7 @@ export function LearnerJourney({ user }: { user: AppUser }) {
       <div className="min-w-0">
         {tab === 'painel' && <VitruvianDashboard pillars={pillars} activeBottleneck={activeBottleneck} onSelectPillar={chooseBottleneck} />}
         {tab === 'fase' && <CurriculumPhaseView phase={phase} user={profile} onOpenReview={(type) => setReviewType(type)} />}
-        {tab === 'biblioteca' && <MasterLibraryView activePhaseTitle={phase.title} />}
+        {tab === 'biblioteca' && <MasterLibraryView activePhaseTitle={phase.title} activePhaseNumber={phase.phaseNumber} />}
         {tab === 'comunidade' && <CommunityFeed user={profile} />}
         {tab === 'auditoria' && <V8AuditView />}
       </div>
