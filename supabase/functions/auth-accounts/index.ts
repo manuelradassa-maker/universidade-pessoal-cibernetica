@@ -113,7 +113,7 @@ Deno.serve(async (request) => {
       if (signInError || !session.session) {
         return json({ error: 'Conta criada, mas não foi possível iniciar sessão. Tente entrar.' }, 400);
       }
-      return json({ session: session.session, user: { username, role: invite.role, status: 'active' } }, 201);
+      return json({ session: session.session, user: { id: created.user.id, username, role: invite.role, status: 'active', created_by: invite.created_by } }, 201);
     }
 
     if (action === 'login') {

@@ -1,6 +1,6 @@
 ﻿import React, { useState } from 'react';
 import { ReviewEntry, VitruvianPillar } from '../types';
-import { CheckSquare, Calendar, BookOpen, Layers, X, Sparkles, Send } from 'lucide-react';
+import { CheckSquare, X, Send } from 'lucide-react';
 
 interface ReviewModalProps {
   type: 'semanal' | 'livro' | 'fase';
@@ -37,14 +37,14 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
       id: 'rev_' + Date.now(),
       type: type,
       date: new Date().toLocaleDateString('pt-PT'),
-      completedChaptersOrEpisodes: chapters || 'N/A',
-      timeSpent: timeSpent || 'N/A',
+      completedChaptersOrEpisodes: chapters.trim(),
+      timeSpent: timeSpent.trim(),
       keyIdeas: keyIdeas.trim(),
       appliedAction: appliedAction.trim(),
       resultObtained: resultObtained.trim(),
-      difficulties: difficulties.trim() || 'Nenhuma barreira crítica registada.',
-      avoided: avoided.trim() || 'Nada evitado.',
-      adjustmentsNeeded: adjustments.trim() || 'Manter o ritmo com rigor.',
+      difficulties: difficulties.trim(),
+      avoided: avoided.trim(),
+      adjustmentsNeeded: adjustments.trim(),
       canExplainWithoutNotes: explain,
       pillarUpdated: activeBottleneck
     };
@@ -174,20 +174,33 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
 
             <div>
               <label className="block text-xs font-mono text-zinc-300 mb-1">
-                Ajuste necessário para o próximo ciclo:
+                O que foi evitado ou adiado?
               </label>
               <textarea
                 rows={2}
                 value={avoided}
                 onChange={(e) => setAvoided(e.target.value)}
-                placeholder="Ex: Deixar a porta fechada e garrafa de água já pronta na mesa."
+                placeholder="Descreve uma ação concreta que evitaste ou adiastes."
                 className="w-full p-3 rounded-lg bg-black/60 border border-zinc-700 text-white text-xs outline-none focus:border-red-500"
               />
             </div>
           </div>
 
+          <label className="block text-xs font-mono text-zinc-300">Ajuste necessário para o próximo ciclo:
+            <textarea rows={2} value={adjustments} onChange={(e) => setAdjustments(e.target.value)} className="mt-1 w-full rounded-lg border border-zinc-700 bg-black/60 p-3 text-xs text-white outline-none focus:border-red-500" />
+          </label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block text-xs font-mono text-zinc-300">Tempo gasto (se conhecido)
+              <input value={timeSpent} onChange={(e) => setTimeSpent(e.target.value)} className="mt-1 w-full rounded-lg border border-zinc-700 bg-black/60 px-3 py-2.5 text-xs text-white outline-none focus:border-red-500" placeholder="Ex.: 2 h 30 min" />
+            </label>
+            <label className="flex items-center gap-2 self-end rounded-lg border border-zinc-800 p-3 text-xs text-zinc-300">
+              <input type="checkbox" checked={explain} onChange={(e) => setExplain(e.target.checked)} className="accent-red-600" />
+              Consigo explicar as ideias sem consultar notas
+            </label>
+          </div>
+
           <div className="p-3 rounded-xl bg-black/70 border border-zinc-800 text-[11px] font-mono text-zinc-400">
-            🏛️ <strong>Atualização Automática:</strong> Esta revisão irá pontuar o pilar [{activeBottleneck.replace('_', ' & ').toUpperCase()}] no Vitruvian System e atualizar o perfil do leitor para a Mentora IA.
+            <strong>Registo transparente:</strong> esta revisão é uma declaração tua. A pontuação dos pilares não aumenta sem um critério observável definido.
           </div>
 
           <div className="flex justify-end gap-3 pt-2">

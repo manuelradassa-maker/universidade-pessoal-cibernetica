@@ -4,6 +4,7 @@ import type {
   ReviewEntry,
   UserProfile,
   VitruvianPillar,
+  ChatMessage,
 } from '../types';
 import {
   INITIAL_LEARNER_DATA,
@@ -28,6 +29,13 @@ import type { AppRole, AppUser } from './supabase';
  * browser. Mudar de dispositivo não transporta o progresso. A
  * migração para uma tabela `learner_state` no Supabase é o passo
  * seguinte e não exige alterações a este contrato.
+ *
+ * ACTUALIZAÇÃO (P1): o estado também vive na tabela `learner_state` e é
+ * sincronizado por `hydrateLearnerState`/`queueLearnerPersist`
+ * (`src/lib/learnerSync.ts`). O contrato acima mantém-se: o localStorage
+ * é sempre a fonte do primeiro paint e a rede é uma melhoria por cima,
+ * nunca um requisito — qualquer falha de rede, de RLS ou a tabela ainda
+ * não aplicada faz a sincronização desligar-se em silêncio.
  */
 
 const STORE_PREFIX = 'upc_learner_v1:';
@@ -37,7 +45,9 @@ export interface LearnerState {
   pillars: PillarInfo[];
   activeBottleneck: VitruvianPillar;
   phase: PracticalPhase;
+  phaseProgress: { activeWeek: number; completedTasks: Record<string, boolean> };
   reviews: ReviewEntry[];
+  mentorMessages: ChatMessage[];
 }
 
 const ROLE_AVATAR: Record<AppRole, string> = {
@@ -66,42 +76,82 @@ export const defaultLearnerState = (appUser: AppUser): LearnerState => ({
   pillars: INITIAL_PILLARS.map((pillar) => ({ ...pillar })),
   activeBottleneck: INITIAL_LEARNER_DATA.currentBottleneckPillar,
   phase: INITIAL_PHASE_EXECUTION,
+  phaseProgress: { activeWeek: 1, completedTasks: {} },
   reviews: [],
+  mentorMessages: [],
 });
+
+/** Monta um estado completo a partir de dados parciais, locais ou remotos. */
+export const mergeLearnerState = (appUser: AppUser, parsed: Partial<LearnerState>): LearnerState => {
+  const fallback = defaultLearnerState(appUser);
+  const pillars = Array.isArray(parsed.pillars) && parsed.pillars.length
+    ? parsed.pillars
+    : fallback.pillars;
+  const merged: LearnerState = {
+    profile: {
+      ...fallback.profile,
+      ...(parsed.profile ?? {}),
+      learnerData: { ...fallback.profile.learnerData, ...(parsed.profile?.learnerData ?? {}) },
+      id: appUser.id,
+      name: appUser.username,
+    },
+    pillars,
+    activeBottleneck: parsed.activeBottleneck ?? fallback.activeBottleneck,
+    phase: parsed.phase ?? fallback.phase,
+    phaseProgress: parsed.phaseProgress ?? fallback.phaseProgress,
+    reviews: Array.isArray(parsed.reviews) ? parsed.reviews : [],
+    mentorMessages: Array.isArray(parsed.mentorMessages) ? parsed.mentorMessages : [],
+  };
+  const oldSeed = !merged.profile.evaluated && merged.reviews.length === 0
+    && merged.profile.learnerData.activeProject === 'Protocolo de Execução Diária Inquebrável'
+    && merged.profile.learnerData.target90DaysResult.startsWith('Estabelecer bloco matinal de 90 minutos');
+  if (!oldSeed) return merged;
+  return {
+    ...merged,
+    profile: { ...merged.profile, learnerData: { ...INITIAL_LEARNER_DATA } },
+    pillars: INITIAL_PILLARS.map((pillar) => ({ ...pillar })),
+    activeBottleneck: INITIAL_LEARNER_DATA.currentBottleneckPillar,
+    phase: INITIAL_PHASE_EXECUTION,
+    phaseProgress: { activeWeek: 1, completedTasks: {} },
+  };
+};
+
+/** Public alias used by the remote-state hydration boundary. */
+export const assembleLearnerState = mergeLearnerState;
 
 /** Lê o estado guardado. Perfis antigos/guardados incompletos recuperam os defaults. */
 export const loadLearnerState = (appUser: AppUser): LearnerState => {
-  const fallback = defaultLearnerState(appUser);
-  if (typeof localStorage === 'undefined') return fallback;
-  const raw = localStorage.getItem(learnerStorageKey(appUser.id));
-  if (!raw) return fallback;
+  if (typeof localStorage === 'undefined') return defaultLearnerState(appUser);
+  let raw: string | null;
+  try { raw = localStorage.getItem(learnerStorageKey(appUser.id)); } catch { return defaultLearnerState(appUser); }
+  if (!raw) return defaultLearnerState(appUser);
   try {
-    const parsed = JSON.parse(raw) as Partial<LearnerState>;
-    const pillars = Array.isArray(parsed.pillars) && parsed.pillars.length
-      ? parsed.pillars
-      : fallback.pillars;
-    return {
-      profile: {
-        ...fallback.profile,
-        ...(parsed.profile ?? {}),
-        learnerData: { ...fallback.profile.learnerData, ...(parsed.profile?.learnerData ?? {}) },
-        id: appUser.id,
-        name: appUser.username,
-      },
-      pillars,
-      activeBottleneck: parsed.activeBottleneck ?? fallback.activeBottleneck,
-      phase: parsed.phase ?? fallback.phase,
-      reviews: Array.isArray(parsed.reviews) ? parsed.reviews : [],
-    };
+    return mergeLearnerState(appUser, JSON.parse(raw) as Partial<LearnerState>);
   } catch {
-    return fallback;
+    return defaultLearnerState(appUser);
+  }
+};
+
+/** Carimbo da última escrita local: decide local vs remoto sem depender do relógio do servidor. */
+export const readLocalSavedAt = (userId: string): string | null => {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(learnerStorageKey(userId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { savedAt?: unknown };
+    return typeof parsed.savedAt === 'string' ? parsed.savedAt : null;
+  } catch {
+    return null;
   }
 };
 
 export const saveLearnerState = (state: LearnerState): void => {
   if (typeof localStorage === 'undefined') return;
   try {
-    localStorage.setItem(learnerStorageKey(state.profile.id), JSON.stringify(state));
+    localStorage.setItem(
+      learnerStorageKey(state.profile.id),
+      JSON.stringify({ ...state, savedAt: new Date().toISOString() }),
+    );
   } catch {
     // Quota cheia ou modo privado: o progresso do browser não pode rebentar a UI.
   }
@@ -128,8 +178,7 @@ export const applyReviewToState = (state: LearnerState, review: ReviewEntry): Le
   pillars: state.pillars.map((pillar) => (pillar.id === review.pillarUpdated
     ? {
         ...pillar,
-        score: Math.min(100, pillar.score + 3),
-        notes: `Última revisão (${review.type}, ${review.date}): ${review.appliedAction}`,
+        notes: `Registo declarado pelo utilizador (${review.type}, ${review.date}): ${review.resultObtained}`,
       }
     : pillar)),
 });

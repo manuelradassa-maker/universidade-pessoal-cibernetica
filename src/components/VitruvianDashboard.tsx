@@ -45,7 +45,7 @@ export const VitruvianDashboard: React.FC<VitruvianDashboardProps> = ({
       default:
         return (
           <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-zinc-900 text-zinc-400 border border-zinc-700">
-            Fase Futura
+            Por avaliar
           </span>
         );
     }
@@ -93,7 +93,7 @@ export const VitruvianDashboard: React.FC<VitruvianDashboardProps> = ({
       {/* The 4 Pillars Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {pillars.map((pillar) => {
-          const isBottleneck = pillar.id === activeBottleneck;
+          const isBottleneck = pillar.status === 'gargalo_atual' && pillar.id === activeBottleneck;
           return (
             <div
               key={pillar.id}
@@ -129,8 +129,8 @@ export const VitruvianDashboard: React.FC<VitruvianDashboardProps> = ({
                 {/* Score bar */}
                 <div className="space-y-1 mb-4">
                   <div className="flex justify-between text-[11px] font-mono">
-                    <span className="text-zinc-500">Nível Observável</span>
-                    <span className="text-zinc-300 font-bold">{pillar.score}%</span>
+                    <span className="text-zinc-500">Nível observável</span>
+                    <span className="text-zinc-300 font-bold">{pillar.status === 'nao_avaliado_ainda' ? '—' : `${pillar.score}%`}</span>
                   </div>
                   <div className="w-full bg-zinc-900 h-1.5 rounded-full overflow-hidden">
                     <div

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { AuthScreen, PublicPortfolio, RoleDashboard } from './components/RoleDashboard';
+import { AuthScreen, RoleDashboard } from './components/RoleDashboard';
+import { PublicCreatorProfile } from './components/PublicCreatorProfile';
 import { AppUser, supabase, supabaseConfigured } from './lib/supabase';
 import './App.css';
 
-function portfolioUsernameFromPath(): string | null {
+function publicUsernameFromPath(): string | null {
   const base = import.meta.env.BASE_URL;
   const redirect = new URLSearchParams(window.location.search).get('__redirect');
   if (redirect) window.history.replaceState(null, '', redirect);
@@ -11,17 +12,18 @@ function portfolioUsernameFromPath(): string | null {
   const path = currentPath.startsWith(base)
     ? `/${currentPath.slice(base.length)}`
     : currentPath;
-  const match = path.match(/^\/portfolio\/([^/]+)\/?$/);
-  return match ? decodeURIComponent(match[1]) : null;
+  const match = path.match(/^\/u\/([^/]+)\/?$/);
+  if (!match) return null;
+  try { return decodeURIComponent(match[1]); } catch { return null; }
 }
 
 export function App() {
-  const portfolioUsername = portfolioUsernameFromPath();
+  const publicUsername = publicUsernameFromPath();
   const [user, setUser] = useState<AppUser | null>(null);
-  const [loading, setLoading] = useState(!portfolioUsername && supabaseConfigured);
+  const [loading, setLoading] = useState(!publicUsername && supabaseConfigured);
 
   useEffect(() => {
-    if (portfolioUsername || !supabase) return;
+    if (publicUsername || !supabase) return;
     const client = supabase;
     let active = true;
     const loadUser = async () => {
@@ -46,9 +48,9 @@ export function App() {
       if (!session) setUser(null);
     });
     return () => { active = false; listener.subscription.unsubscribe(); };
-  }, [portfolioUsername]);
+  }, [publicUsername]);
 
-  if (portfolioUsername) return <PublicPortfolio username={portfolioUsername} />;
+  if (publicUsername) return <PublicCreatorProfile username={publicUsername} />;
   if (loading) return <main className="flex min-h-screen items-center justify-center bg-black text-zinc-300">A verificar sessão...</main>;
   if (!user) return <AuthScreen onAuthenticated={setUser} />;
   return <RoleDashboard user={user} onLogout={() => void supabase?.auth.signOut()} />;

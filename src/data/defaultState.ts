@@ -1,40 +1,15 @@
 import { PillarInfo, PracticalPhase, LearnerProfileData } from '../types';
 import { CANONICAL_RESOURCES } from './curriculumData';
 
+// Perfil em branco: o diagnóstico tem de vir da pessoa autenticada.
 export const INITIAL_LEARNER_DATA: LearnerProfileData = {
-  targetPerson: 'Eu próprio',
-  ageOrMaturity: 'Jovem Adulto (18-25 anos)',
-  countryContext: 'Portugal / Brasil',
-  primaryLanguage: 'Português',
-  currentRoleAndStage: 'Estudante e aspirante a construtor de projetos de alto valor',
-  desiredIdentity: 'Um indivíduo disciplinado, emocionalmente estável, com raciocínio crítico rigoroso e capacidade de execução no mercado real.',
-  topLongTermOutcomes: '1. Autodomínio físico e mental\n2. Independência económica através de competências reais\n3. Sabedoria prática e clareza de pensamento',
-  primaryLongTermGoal: 'Construir um ecossistema sustentável de valor e manter clareza cognitiva.',
-  urgentCurrentProblem: 'Inconsistência na execução diária e vulnerabilidade à dispersão digital.',
-  target90DaysResult: 'Estabelecer bloco matinal de 90 minutos de trabalho focado e validar primeira entrega real.',
-  activeProject: 'Protocolo de Execução Diária Inquebrável',
-  evidenceProgressMade: 'Tentativas de rotina matinal com interrupções frequentes.',
-  capabilities: {
-    selfDiscipline: 2,
-    focus: 2,
-    habitConsistency: 1,
-    emotionalRegulation: 2,
-    physicalEnergy: 3,
-    learningAbility: 3,
-    criticalThinking: 2,
-    salesAndOffers: 1,
-    businessStrategy: 1
-  },
-  completedBooks: 'Nenhum livro técnico concluído com anotação ativa recente.',
-  dislikedOrAbandoned: 'Livros de autoajuda vazia e promessas de sucesso sem evidência.',
-  contentPreference: 'livros',
-  weeklyHoursAvailable: 8,
-  learningPreferencesNotes: 'Prefere materiais com exemplos reais, modelos mentais claros e aplicação imediata.',
-  repeatedMistakeOrDistraction: 'Consumir tutoriais e vídeos sem produzir um entregável concreto.',
-  currentBottleneckPillar: 'corpo_acao',
-  currentBottleneck: 'Inconsistencia diaria e vulnerabilidade a distracao digital',
-  weakPoints: 'Procrastinacao, dispersao de atencao, ausencia de sistema de registo',
-  applicationEnvironment: 'Projetos pessoais, estudo formal e rotinas diarias'
+  targetPerson: '', ageOrMaturity: '', countryContext: '', primaryLanguage: '', currentRoleAndStage: '',
+  desiredIdentity: '', topLongTermOutcomes: '', primaryLongTermGoal: '', urgentCurrentProblem: '',
+  target90DaysResult: '', activeProject: '', evidenceProgressMade: '',
+  capabilities: { selfDiscipline: 0, focus: 0, habitConsistency: 0, emotionalRegulation: 0, physicalEnergy: 0, learningAbility: 0, criticalThinking: 0, salesAndOffers: 0, businessStrategy: 0 },
+  completedBooks: '', dislikedOrAbandoned: '', contentPreference: 'livros', weeklyHoursAvailable: 0,
+  learningPreferencesNotes: '', repeatedMistakeOrDistraction: '', currentBottleneckPillar: 'mente',
+  currentBottleneck: '', weakPoints: '', applicationEnvironment: ''
 };
 
 export const INITIAL_PILLARS: PillarInfo[] = [
@@ -45,8 +20,8 @@ export const INITIAL_PILLARS: PillarInfo[] = [
     emoji: '🧠',
     description: 'Pensamento racional, autoconsciência e separação rigorosa entre facto objetivo e interpretação subjetiva.',
     status: 'nao_avaliado_ainda',
-    score: 50,
-    notes: 'Aguardando diagnóstico conversacional inicial.',
+    score: 0,
+    notes: '',
     invisibleModules: [
       'Deteção de inferências automáticas',
       'Reconhecimento de padrões e loops reativos',
@@ -61,8 +36,8 @@ export const INITIAL_PILLARS: PillarInfo[] = [
     emoji: '📚',
     description: 'Organização dinâmica do saber: leitura ativa, modelos mentais, repetição espaçada e retenção factual.',
     status: 'nao_avaliado_ainda',
-    score: 50,
-    notes: 'Aguardando diagnóstico conversacional inicial.',
+    score: 0,
+    notes: '',
     invisibleModules: [
       'Leitura Inspecional e Sintópica',
       'Modelos Mentais Multidisciplinares',
@@ -75,9 +50,9 @@ export const INITIAL_PILLARS: PillarInfo[] = [
     subtitle: 'Camada de Execução',
     emoji: '⚡',
     description: 'Disciplina física, regulação do sono, hábitos inegociáveis e métricas quantitativas com evidência observável.',
-    status: 'gargalo_atual',
-    score: 35,
-    notes: 'Gargalo prioritário identificado no Perfil do Leitor V8: vulnerabilidade a distrações e falta de consistência diária observável.',
+    status: 'nao_avaliado_ainda',
+    score: 0,
+    notes: '',
     invisibleModules: [
       'Higiene Circadiana & Sono Otimizado',
       'Regra dos 2 Minutos & Habit Stacking',
@@ -91,8 +66,8 @@ export const INITIAL_PILLARS: PillarInfo[] = [
     emoji: '🎯',
     description: 'Direção existencial, projetos com entrega real no mundo, criação de valor económico e espírito de serviço.',
     status: 'nao_avaliado_ainda',
-    score: 50,
-    notes: 'Aguardando consolidação do autodomínio prático.',
+    score: 0,
+    notes: '',
     invisibleModules: [
       'Equação de Criação de Valor Real',
       'Validação de Oferta & Mercado',

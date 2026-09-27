@@ -1,403 +1,143 @@
-import React, { useState } from 'react';
-import { UserProfile, ContentFormat, VitruvianPillar } from '../types';
-import { Sparkles, Compass, AlertTriangle, BookOpen, Film, Clock, Target, CheckCircle2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, ArrowLeft, ArrowRight, Check, X } from 'lucide-react';
+import type { UserProfile, VitruvianPillar } from '../types';
+import { V8_CORE_FIELDS, V8_INTAKE_SECTIONS } from '../data/v8Intake';
 
 interface ReaderDiagnosticModalProps {
   user: UserProfile;
   onComplete: (updatedUser: UserProfile, bottleneckPillar: VitruvianPillar) => void;
+  onDraftChange: (answers: Record<string, string>) => void;
+  onClose?: () => void;
 }
 
-export const ReaderDiagnosticModal: React.FC<ReaderDiagnosticModalProps> = ({
-  user,
-  onComplete
-}) => {
-  const [step, setStep] = useState<number>(1);
-  const totalSteps = 5;
+const PILLARS: { id: VitruvianPillar; name: string; prompt: string }[] = [
+  { id: 'mente', name: 'Mente', prompt: 'Pensamento, emoções, decisões ou autoconsciência' },
+  { id: 'intelecto', name: 'Intelecto', prompt: 'Aprendizagem, leitura, retenção ou raciocínio' },
+  { id: 'corpo_acao', name: 'Corpo & Ação', prompt: 'Energia, atenção, disciplina ou consistência' },
+  { id: 'proposito', name: 'Propósito', prompt: 'Carreira, negócio, direção ou criação de valor' },
+];
 
-  // Form State
-  const [contentPref, setContentPref] = useState<ContentFormat>('livros');
-  const [urgentTarget, setUrgentTarget] = useState('');
-  const [timeAvailable, setTimeAvailable] = useState<number>(8);
-  const [weakPoint, setWeakPoint] = useState('');
-  const [activeProject, setActiveProject] = useState('');
-  const [selectedBottleneck, setSelectedBottleneck] = useState<VitruvianPillar>('corpo_acao');
-  const [vagueWarning, setVagueWarning] = useState('');
+const inputClass = 'w-full rounded-xl border border-zinc-700 bg-black/50 px-3.5 py-3 text-sm text-white outline-none transition focus:border-red-500 focus:ring-1 focus:ring-red-500';
 
-  const validateConcreteness = (text: string): boolean => {
-    const trimmed = text.trim().toLowerCase();
-    if (trimmed.length < 10) return false;
-    const vaguePhrases = [
-      'quero melhorar',
-      'ser melhor',
-      'ter sucesso',
-      'aprender coisas',
-      'evoluir',
-      'ganhar dinheiro',
-      'ler mais'
-    ];
-    for (const phrase of vaguePhrases) {
-      if (trimmed === phrase) return false;
+export function ReaderDiagnosticModal({ user, onComplete, onDraftChange, onClose }: ReaderDiagnosticModalProps) {
+  const sections = V8_INTAKE_SECTIONS;
+  const [step, setStep] = useState(() => Math.max(0, Math.min(sections.length, Number.parseInt(user.v8Intake?._step ?? '0', 10) || 0)));
+  const [answers, setAnswers] = useState<Record<string, string>>(user.v8Intake ?? {});
+  const [bottleneck, setBottleneck] = useState<VitruvianPillar | ''>(user.v8Intake?._bottleneck as VitruvianPillar | undefined ?? (user.evaluated ? user.learnerData.currentBottleneckPillar : ''));
+  const [bottleneckEvidence, setBottleneckEvidence] = useState(user.v8Intake?._bottleneckEvidence ?? (user.evaluated ? user.learnerData.currentBottleneck : ''));
+  const [error, setError] = useState('');
+  const totalSteps = sections.length + 1;
+  const current = sections[step];
+  const answeredCore = useMemo(() => V8_CORE_FIELDS.every((key) => {
+    const value = (answers[key] ?? '').trim();
+    return value.length > 0 && !/^(desconhecido|não sei|nao sei)$/i.test(value);
+  }), [answers]);
+
+  useEffect(() => { onDraftChange({ ...answers, _step: String(step), _bottleneck: bottleneck, _bottleneckEvidence: bottleneckEvidence }); }, [answers, step, bottleneck, bottleneckEvidence, onDraftChange]);
+  const setAnswer = (id: string, value: string) => setAnswers((previous) => ({ ...previous, [id]: value }));
+  const fillUnknown = () => setAnswers((previous) => ({
+    ...previous,
+    ...Object.fromEntries((current?.fields ?? []).map((field) => [field.id, previous[field.id]?.trim() ? previous[field.id] : 'Desconhecido'])),
+  }));
+
+  const finish = () => {
+    const hours = Number.parseFloat(answers.hours ?? '');
+    const concretePriority = (answers.problem ?? '').trim().length >= 15 && (answers.result ?? '').trim().length >= 20
+      && !/^(quero melhorar|ser melhor|ter sucesso|evoluir|ler mais)$/i.test((answers.result ?? '').trim());
+    if (!answeredCore || !Number.isFinite(hours) || hours <= 0 || !concretePriority) {
+      setError('Para recomendar a primeira fase, preciso de contexto, prioridade dos próximos 90 dias, disponibilidade, formato e um bloqueio atual. Se ainda não sabes, deixa o diagnóstico por concluir.');
+      return;
     }
-    return true;
-  };
-
-  const handleNextStep = () => {
-    setVagueWarning('');
-
-    if (step === 2) {
-      if (!urgentTarget.trim()) {
-        setVagueWarning('Por favor indique o seu objetivo.');
-        return;
-      }
-      if (!validateConcreteness(urgentTarget)) {
-        setVagueWarning(
-          'Aviso do Motor Adaptativo: Resposta vaga detetada ("quero melhorar"). Concretize com prazo e ação verificável. Exemplo: "Validar o primeiro serviço pago em 60 dias e manter consistência diária."'
-        );
-        return;
-      }
+    if (!bottleneck || bottleneckEvidence.trim().length < 12) {
+      setError('Escolhe o pilar que consideras mais bloqueado e descreve um exemplo recente que sustente essa hipótese.');
+      return;
     }
-
-    if (step === 3) {
-      if (!weakPoint.trim()) {
-        setVagueWarning('Por favor identifique o seu principal ponto fraco.');
-        return;
-      }
-    }
-
-    if (step < totalSteps) {
-      setStep(step + 1);
-    } else {
-      // Complete evaluation
-      const updated: UserProfile = {
-        ...user,
-        learnerData: {
-          ...user.learnerData,
-          contentPreference: contentPref,
-          target90DaysResult: urgentTarget,
-          weeklyHoursAvailable: timeAvailable,
-          weakPoints: weakPoint,
-          activeProject: activeProject || 'Estruturação do Bloco Diário de Foco',
-          currentBottleneck: selectedBottleneck,
-          currentBottleneckPillar: selectedBottleneck,
+    const number = (key: string) => {
+      const parsed = Number.parseInt(answers[`${key}Rating`] ?? '', 10);
+      return Number.isFinite(parsed) ? Math.min(5, Math.max(0, parsed)) : 0;
+    };
+    const updated: UserProfile = {
+      ...user,
+      v8Intake: Object.fromEntries(Object.entries(answers).filter(([key]) => !key.startsWith('_'))),
+      learnerData: {
+        ...user.learnerData,
+        targetPerson: answers.learner ?? '', ageOrMaturity: answers.age ?? '', countryContext: answers.country ?? '',
+        primaryLanguage: answers.language ?? '', currentRoleAndStage: `${answers.role ?? ''} — ${answers.lifeStage ?? ''}`.trim(),
+        desiredIdentity: answers.identity ?? '', topLongTermOutcomes: answers.outcomes ?? '',
+        primaryLongTermGoal: [answers.personalGoal, answers.intellectualGoal, answers.careerGoal, answers.businessGoal].filter(Boolean).join('\n'),
+        urgentCurrentProblem: answers.problem ?? '', target90DaysResult: answers.result ?? '', activeProject: answers.project ?? '',
+        evidenceProgressMade: answers.progress ?? '',
+        capabilities: {
+          selfDiscipline: number('discipline'), focus: number('focus'), habitConsistency: number('habits'),
+          emotionalRegulation: number('emotion'), physicalEnergy: number('energy'), learningAbility: number('learning'),
+          criticalThinking: number('critical'), salesAndOffers: number('sales'), businessStrategy: number('strategy'),
         },
-        evaluated: true
-      };
-      onComplete(updated, selectedBottleneck);
-    }
+        completedBooks: answers.completed ?? '', dislikedOrAbandoned: [answers.disliked, answers.abandoned].filter(Boolean).join('\n'),
+        contentPreference: /áudio|audiovisual|vídeo|video/i.test(answers.format ?? '') ? 'audiovisual' : /misto|ambos/i.test(answers.format ?? '') ? 'misto' : 'livros',
+        weeklyHoursAvailable: hours,
+        learningPreferencesNotes: [answers.learn, answers.retain, answers.feedback].filter(Boolean).join('\n'),
+        repeatedMistakeOrDistraction: [answers.mistake, answers.distraction].filter(Boolean).join('\n'),
+        currentBottleneckPillar: bottleneck,
+        currentBottleneck: bottleneckEvidence.trim(),
+        weakPoints: [answers.habit, answers.avoidance, answers.fear].filter(Boolean).join('\n'),
+        applicationEnvironment: [answers.projects, answers.people, answers.skills, answers.decisions].filter(Boolean).join('\n'),
+      },
+      evaluated: true,
+    };
+    onComplete(updated, bottleneck);
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-lg">
-      <div className="relative w-full max-w-2xl p-6 md:p-8 bg-[#0a0a0f] border-2 border-red-600/50 rounded-2xl shadow-2xl cyber-glow-red overflow-hidden flex flex-col max-h-[90vh]">
-        {/* Top Progress bar */}
-        <div className="w-full bg-zinc-900 h-1.5 rounded-full overflow-hidden mb-6">
-          <div
-            className="bg-gradient-to-r from-red-600 to-red-400 h-full transition-all duration-300 shadow-sm shadow-red-500"
-            style={{ width: `${(step / totalSteps) * 100}%` }}
-          />
+  const next = () => {
+    setError('');
+    if (step === 3) {
+      const capabilityFields = sections[step].fields.filter((field) => field.kind === 'rating');
+      const incomplete = capabilityFields.some((field) => {
+        const rating = answers[field.id];
+        const evidence = answers[field.id.replace('Rating', 'Evidence')]?.trim() ?? '';
+        return !rating || (rating !== 'Desconhecido' && evidence.length < 8);
+      });
+      if (incomplete) {
+        setError('Para cada capacidade, escolhe uma nota e da um exemplo concreto; se nao souberes, assinala Desconhecido.');
+        return;
+      }
+    }
+    if (step < sections.length) setStep(step + 1);
+    else finish();
+  };
+
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 backdrop-blur-sm md:p-6">
+    <section role="dialog" aria-modal="true" aria-labelledby="intake-title" className="flex max-h-[94vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-zinc-700 bg-[#101014] shadow-2xl shadow-black/70">
+      <header className="border-b border-zinc-800 px-5 py-4 md:px-7">
+        <div className="flex items-start justify-between gap-4">
+          <div><p className="text-xs font-semibold uppercase tracking-[.18em] text-red-400">Entrevista guiada · V8</p><h2 id="intake-title" className="mt-1 text-xl font-semibold text-white">{current?.title ?? 'Síntese e gargalo'}</h2><p className="mt-1 text-sm text-zinc-400">{current?.prompt ?? 'Confirma uma hipótese de gargalo com um exemplo real.'}</p></div>
+          {onClose && <button type="button" onClick={onClose} className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-800 hover:text-white" aria-label="Fechar diagnóstico"><X size={18} /></button>}
         </div>
+        <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-zinc-800"><div className="h-full rounded-full bg-red-500 transition-all" style={{ width: `${((step + 1) / totalSteps) * 100}%` }} /></div>
+        <p className="mt-2 text-right text-xs text-zinc-500">Bloco {step + 1} de {totalSteps}</p>
+      </header>
 
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-800 pb-4 mb-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-red-950/80 border border-red-500/40 text-red-400">
-              <Compass className="w-5 h-5 animate-spin-slow" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold font-display text-white flex items-center gap-2">
-                Motor de Mentoria Adaptativa <span className="text-red-500 text-sm font-mono">v8.0</span>
-              </h2>
-              <p className="text-xs text-zinc-400">
-                Diagnóstico de Entrada & Calibração do Perfil do Leitor (Passo {step} de {totalSteps})
-              </p>
-            </div>
-          </div>
-          <span className="text-xs font-mono text-zinc-500 bg-zinc-900/80 px-2.5 py-1 rounded border border-zinc-800">
-            Regra: Não Inventar Respostas
-          </span>
-        </div>
-
-        {/* Dynamic Step Content */}
-        <div className="flex-1 overflow-y-auto pr-1 space-y-6">
-          {/* STEP 1: PREFERÊNCIA DE FORMATO (LIVROS VS DOCUMENTÁRIOS/FILMES/SÉRIES) */}
-          {step === 1 && (
-            <div className="space-y-4">
-              <div className="p-4 rounded-xl bg-red-950/20 border border-red-900/40">
-                <h3 className="text-base font-semibold text-white mb-1 flex items-center gap-2">
-                  <Film className="w-4 h-4 text-red-400" />
-                  Como prefere assimilar conhecimento prático?
-                </h3>
-                <p className="text-xs text-zinc-400">
-                  A Universidade Cibernética adapta-se ao seu estilo real. Se não gostar ou tiver bloqueio com livros extensos, o sistema substitui automaticamente por documentários premiados, séries investigativas e estudos em vídeo.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setContentPref('livros')}
-                  className={`p-4 rounded-xl border text-left transition-all ${
-                    contentPref === 'livros'
-                      ? 'bg-red-950/60 border-red-500 shadow-md shadow-red-900/30 text-white'
-                      : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 text-zinc-300'
-                  }`}
-                >
-                  <div className="text-2xl mb-2">📚</div>
-                  <div className="font-semibold text-sm">Leitura Tradicional</div>
-                  <div className="text-xs text-zinc-400 mt-1">
-                    Livros canónicos, ensaios e manuais estratégicos.
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setContentPref('audiovisual')}
-                  className={`p-4 rounded-xl border text-left transition-all ${
-                    contentPref === 'audiovisual'
-                      ? 'bg-red-950/60 border-red-500 shadow-md shadow-red-900/30 text-white'
-                      : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 text-zinc-300'
-                  }`}
-                >
-                  <div className="text-2xl mb-2">🎬</div>
-                  <div className="font-semibold text-sm">Audiovisual Factual</div>
-                  <div className="text-xs text-zinc-400 mt-1">
-                    Documentários científicos, séries e filmes reais.
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setContentPref('misto')}
-                  className={`p-4 rounded-xl border text-left transition-all ${
-                    contentPref === 'misto'
-                      ? 'bg-red-950/60 border-red-500 shadow-md shadow-red-900/30 text-white'
-                      : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 text-zinc-300'
-                  }`}
-                >
-                  <div className="text-2xl mb-2">⚡</div>
-                  <div className="font-semibold text-sm">Formato Híbrido</div>
-                  <div className="text-xs text-zinc-400 mt-1">
-                    Capítulos-chave de livros + documentários aplicados.
-                  </div>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 2: OBJETIVO URGENTE */}
-          {step === 2 && (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-white mb-2 flex items-center gap-2">
-                  <Target className="w-4 h-4 text-red-400" />
-                  Qual é o seu objetivo mais urgente para os próximos 60–90 dias?
-                </label>
-                <p className="text-xs text-zinc-400 mb-3">
-                  Evite respostas vagas como "quero ser melhor". Especifique uma mudança mensurável (projeto, receita, disciplina, saúde ou rotina).
-                </p>
-                <textarea
-                  rows={4}
-                  value={urgentTarget}
-                  onChange={(e) => setUrgentTarget(e.target.value)}
-                  placeholder="Ex: Quero construir uma rotina matinal inegociável de 90 minutos de foco e validar o meu primeiro cliente pago de serviços nos próximos 60 dias."
-                  className="w-full p-3.5 rounded-xl bg-black/70 border border-zinc-700 focus:border-red-500 focus:ring-1 focus:ring-red-500 text-white text-sm outline-none transition-all placeholder-zinc-600"
-                />
-              </div>
-
-              {vagueWarning && (
-                <div className="p-3.5 rounded-lg bg-red-950/80 border border-red-600 text-red-200 text-xs font-mono flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
-                  <span>{vagueWarning}</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* STEP 3: PONTO FRACO MAIS CRÍTICO */}
-          {step === 3 && (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-white mb-2 flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-red-400" />
-                  Qual é o seu ponto fraco ou bloqueio mais crítico atualmente?
-                </label>
-                <p className="text-xs text-zinc-400 mb-3">
-                  O que é que normalmente sabota os seus planos (procrastinação, falta de energia física, sobrecarga de informação, distração digital ou medo de julgamento)?
-                </p>
-                <textarea
-                  rows={4}
-                  value={weakPoint}
-                  onChange={(e) => setWeakPoint(e.target.value)}
-                  placeholder="Ex: Começo com muito entusiasmo mas perco a consistência após 4 dias, dispersando-me no telemóvel e consumindo vídeos sem executar nada prático."
-                  className="w-full p-3.5 rounded-xl bg-black/70 border border-zinc-700 focus:border-red-500 focus:ring-1 focus:ring-red-500 text-white text-sm outline-none transition-all placeholder-zinc-600"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* STEP 4: TEMPO SEMANAL DISPONÍVEL */}
-          {step === 4 && (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-white mb-2 flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-red-400" />
-                  Quantas horas realistas por semana pode dedicar ao plano prático?
-                </label>
-                <p className="text-xs text-zinc-400 mb-4">
-                  Seja rigoroso: o currículo V8 rejeita metas irreais que geram culpa ou abandono.
-                </p>
-                <div className="flex items-center gap-4 bg-zinc-900/60 p-4 rounded-xl border border-zinc-800">
-                  <input
-                    type="range"
-                    min="3"
-                    max="25"
-                    step="1"
-                    value={timeAvailable}
-                    onChange={(e) => setTimeAvailable(Number(e.target.value))}
-                    className="w-full accent-red-600 cursor-pointer"
-                  />
-                  <div className="font-mono font-bold text-red-400 text-lg w-20 text-right">
-                    {timeAvailable}h / sem
-                  </div>
-                </div>
-                <div className="text-xs text-zinc-500 font-mono">
-                  {timeAvailable <= 5 && 'Ritmo Leve: 30 a 45 minutos por dia (foco em 1 hábito chave).'}
-                  {timeAvailable > 5 && timeAvailable <= 12 && 'Ritmo Padrão: 1 a 1h30 por dia (recomendado para a maioria).'}
-                  {timeAvailable > 12 && 'Ritmo Intensivo: Scaffolding acelerado com projeto semanal.'}
-                </div>
-              </div>
-
-              <div className="mt-4">
-                <label className="block text-xs font-mono text-zinc-300 mb-1.5">
-                  Tem algum projeto ativo agora? (Opcional)
-                </label>
-                <input
-                  type="text"
-                  value={activeProject}
-                  onChange={(e) => setActiveProject(e.target.value)}
-                  placeholder="Ex: Lançamento de freelance / Estudo para exames / Melhoria física"
-                  className="w-full px-3.5 py-2.5 rounded-lg bg-black/60 border border-zinc-700 focus:border-red-500 text-white text-sm outline-none"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* STEP 5: CLASSIFICAÇÃO NO VITRUVIAN SYSTEM (GARGALO ATUAL) */}
-          {step === 5 && (
-            <div className="space-y-4">
-              <div className="p-3.5 rounded-xl bg-zinc-900/60 border border-zinc-800">
-                <h3 className="text-sm font-semibold text-white mb-1 flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-red-400" />
-                  Identificação do Pilar Gargalo (Vitruvian System)
-                </h3>
-                <p className="text-xs text-zinc-400">
-                  O V8 Master Prompt nunca recomenda currículos a esmo: a primeira fase deve atacar exatamente o pilar que está a bloquear os restantes. Onde está o seu maior travão?
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setSelectedBottleneck('mente')}
-                  className={`p-4 rounded-xl border text-left transition-all ${
-                    selectedBottleneck === 'mente'
-                      ? 'bg-red-950/70 border-red-500 shadow-md text-white'
-                      : 'bg-zinc-900/40 border-zinc-800 text-zinc-300'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 font-bold text-sm mb-1">
-                    <span>🧠</span> Mente (Cognitive Interface)
-                  </div>
-                  <div className="text-xs text-zinc-400">
-                    Ansiedade, pensamentos intrusivos, reatividade emocional, dispersão de foco.
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedBottleneck('corpo_acao')}
-                  className={`p-4 rounded-xl border text-left transition-all ${
-                    selectedBottleneck === 'corpo_acao'
-                      ? 'bg-red-950/70 border-red-500 shadow-md text-white'
-                      : 'bg-zinc-900/40 border-zinc-800 text-zinc-300'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 font-bold text-sm mb-1">
-                    <span>⚡</span> Corpo & Ação (Camada de Execução)
-                  </div>
-                  <div className="text-xs text-zinc-400">
-                    Procrastinação, sono desregulado, falta de hábitos diários consistentes, baixa energia.
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedBottleneck('intelecto')}
-                  className={`p-4 rounded-xl border text-left transition-all ${
-                    selectedBottleneck === 'intelecto'
-                      ? 'bg-red-950/70 border-red-500 shadow-md text-white'
-                      : 'bg-zinc-900/40 border-zinc-800 text-zinc-300'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 font-bold text-sm mb-1">
-                    <span>📚</span> Intelecto (Estrutura de Conhecimento)
-                  </div>
-                  <div className="text-xs text-zinc-400">
-                    Dificuldade de retenção, leitura superficial, falta de modelos mentais de decisão.
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedBottleneck('proposito')}
-                  className={`p-4 rounded-xl border text-left transition-all ${
-                    selectedBottleneck === 'proposito'
-                      ? 'bg-red-950/70 border-red-500 shadow-md text-white'
-                      : 'bg-zinc-900/40 border-zinc-800 text-zinc-300'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 font-bold text-sm mb-1">
-                    <span>🎯</span> Propósito (Externalização de Valor)
-                  </div>
-                  <div className="text-xs text-zinc-400">
-                    Sem clareza de carreira, dificuldade em criar ofertas que o mercado pague, indecisão.
-                  </div>
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Footer / Buttons */}
-        <div className="flex items-center justify-between border-t border-zinc-800 pt-4 mt-6">
-          {step > 1 ? (
-            <button
-              type="button"
-              onClick={() => setStep(step - 1)}
-              className="px-4 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-mono transition-colors"
-            >
-              ← Voltar
-            </button>
-          ) : (
-            <div />
-          )}
-
-          <button
-            type="button"
-            onClick={handleNextStep}
-            className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-semibold text-xs font-mono uppercase tracking-wider transition-all duration-200 shadow-lg shadow-red-950 flex items-center gap-2"
-          >
-            {step === totalSteps ? (
-              <>
-                <CheckCircle2 className="w-4 h-4 text-green-300" />
-                Gerar Plano Personalizado
-              </>
-            ) : (
-              'Continuar Diagnóstico →'
-            )}
-          </button>
-        </div>
+      <div className="flex-1 space-y-4 overflow-y-auto px-5 py-5 md:px-7">
+        {current ? <>
+          <p className="rounded-lg border border-zinc-800 bg-black/30 p-3 text-xs leading-5 text-zinc-400">Responde ao que sabes. Podes escrever “Desconhecido” ou “Não se aplica”; não inventamos respostas. O perfil completo fica guardado na tua conta quando terminares a entrevista.</p>
+          {current.fields.map((field) => <label key={field.id} className="block space-y-1.5 text-sm text-zinc-200"><span>{field.label}{field.kind === 'rating' && <span className="ml-2 text-xs text-zinc-500">0 = ainda não consigo demonstrar · 5 = consigo demonstrar consistentemente</span>}</span>
+            {field.kind === 'rating' ? <select className={inputClass} value={answers[field.id] ?? ''} onChange={(event) => setAnswer(field.id, event.target.value)}><option value="">Escolher</option>{[0, 1, 2, 3, 4, 5].map((rating) => <option key={rating} value={rating}>{rating}</option>)}<option value="Desconhecido">Desconhecido</option></select>
+              : field.kind === 'long' ? <textarea rows={2} className={inputClass} value={answers[field.id] ?? ''} onChange={(event) => setAnswer(field.id, event.target.value)} />
+                : <input className={inputClass} value={answers[field.id] ?? ''} onChange={(event) => setAnswer(field.id, event.target.value)} />}
+          </label>)}
+          <button type="button" className="text-xs text-zinc-400 underline decoration-zinc-600 underline-offset-4 hover:text-white" onClick={fillUnknown}>Assinalar como desconhecidos os campos vazios deste bloco</button>
+        </> : <>
+          <div className="rounded-xl border border-amber-900/70 bg-amber-950/20 p-4 text-sm leading-6 text-amber-100"><AlertTriangle className="mr-2 inline text-amber-400" size={16} />Esta escolha é uma hipótese reportada por ti, não uma avaliação automática nem uma medição objetiva. Poderás alterá-la quando surgirem novas evidências.</div>
+          <div className="grid gap-3 sm:grid-cols-2">{PILLARS.map((pillar) => <button key={pillar.id} type="button" onClick={() => setBottleneck(pillar.id)} className={`rounded-xl border p-4 text-left transition ${bottleneck === pillar.id ? 'border-red-500 bg-red-950/30' : 'border-zinc-800 bg-black/20 hover:border-zinc-600'}`}><span className="font-semibold text-white">{pillar.name}</span><span className="mt-1 block text-xs text-zinc-400">{pillar.prompt}</span></button>)}</div>
+          <label className="block space-y-1.5 text-sm text-zinc-200">Que situação recente sustenta esta hipótese?<textarea rows={4} className={inputClass} value={bottleneckEvidence} onChange={(event) => setBottleneckEvidence(event.target.value)} placeholder="Descreve o que aconteceu, quando e que resultado observável teve." /></label>
+          {!answeredCore && <p className="text-sm text-amber-300">A entrevista ainda não tem contexto suficiente para gerar uma recomendação. Volta aos blocos em falta.</p>}
+        </>}
+        {error && <p role="alert" className="rounded-lg border border-red-800 bg-red-950/40 p-3 text-sm text-red-200">{error}</p>}
       </div>
-    </div>
-  );
-};
+
+      <footer className="flex items-center justify-between border-t border-zinc-800 px-5 py-4 md:px-7">
+        <button type="button" disabled={step === 0} onClick={() => { setError(''); setStep(Math.max(0, step - 1)); }} className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 disabled:opacity-30"><ArrowLeft size={16} /> Anterior</button>
+        <button type="button" onClick={next} className="inline-flex items-center gap-2 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600">{step === totalSteps - 1 ? <><Check size={16} /> Guardar diagnóstico</> : <>Continuar <ArrowRight size={16} /></>}</button>
+      </footer>
+    </section>
+  </div>;
+}

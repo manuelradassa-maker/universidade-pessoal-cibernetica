@@ -1,6 +1,6 @@
 ﻿import React, { useState } from 'react';
 import { UserProfile, PracticalPhase, PillarInfo } from '../types';
-import { RefreshCw, Copy, Check, X, FileText } from 'lucide-react';
+import { Copy, Check, X, FileText } from 'lucide-react';
 
 interface HandoffModalProps {
   user: UserProfile;

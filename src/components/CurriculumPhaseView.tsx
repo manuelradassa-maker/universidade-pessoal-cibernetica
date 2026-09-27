@@ -1,28 +1,27 @@
-﻿import React, { useState } from 'react';
-import { PracticalPhase, UserProfile, CurriculumResource } from '../types';
-import { BookOpen, Film, Target, Calendar, CheckSquare, Sparkles, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import React from 'react';
+import { PracticalPhase, CurriculumResource } from '../types';
+import { BookOpen, Film, Target, Calendar, Sparkles, ShieldAlert, CheckCircle2 } from 'lucide-react';
 
 const roleLine = (r: CurriculumResource): string => `${r.role} · ${r.evidenceClass} · stage ${r.stage} · ${r.readDepth}`;
 
 interface CurriculumPhaseViewProps {
   phase: PracticalPhase;
-  user: UserProfile;
+  progress: { activeWeek: number; completedTasks: Record<string, boolean> };
+  onProgressChange: (progress: { activeWeek: number; completedTasks: Record<string, boolean> }) => void;
   onOpenReview: (type: 'semanal' | 'livro' | 'fase') => void;
 }
 
 export const CurriculumPhaseView: React.FC<CurriculumPhaseViewProps> = ({
   phase,
-  user,
+  progress,
+  onProgressChange,
   onOpenReview
 }) => {
-  const [activeWeek, setActiveWeek] = useState<number>(1);
-  const [completedTasks, setCompletedTasks] = useState<Record<string, boolean>>({});
+  const activeWeek = progress.activeWeek;
+  const completedTasks = progress.completedTasks;
 
   const toggleTask = (taskId: string) => {
-    setCompletedTasks((prev) => ({
-      ...prev,
-      [taskId]: !prev[taskId]
-    }));
+    onProgressChange({ ...progress, completedTasks: { ...completedTasks, [taskId]: !completedTasks[taskId] } });
   };
 
   return (
@@ -228,7 +227,7 @@ export const CurriculumPhaseView: React.FC<CurriculumPhaseViewProps> = ({
             {phase.weeklyPlan.map((wp) => (
               <button
                 key={wp.week}
-                onClick={() => setActiveWeek(wp.week)}
+                onClick={() => onProgressChange({ ...progress, activeWeek: wp.week })}
                 className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all ${
                   activeWeek === wp.week
                     ? 'bg-red-600 text-white shadow-md shadow-red-900'

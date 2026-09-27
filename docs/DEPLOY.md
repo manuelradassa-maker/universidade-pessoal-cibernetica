@@ -31,17 +31,39 @@ sem `.env` produz um site que mostra apenas "Supabase não está configurado". N
 colocar `service_role`, `ADMIN_SHARED_PASSWORD` nem `ADMIN_BOOTSTRAP_SECRET` em
 variáveis `VITE_` — o bundle é público.
 
-Custo do fallback de rotas: `public/404.html` redirecciona para
-`?__redirect=<path>`, o que faz `/portfolio/username` funcionar no browser, mas o
-GitHub Pages devolve sempre **HTTP 404** nesse caminho. Links partilhados e
-pré-visualizações sociais veem um 404. Só se resolve com um host que faça rewrite a
-verdadeiro (Vercel/Netlify) e `base` ajustado em `vite.config.ts`.
+Perfis partilhados usam agora a Edge Function `public-profile`, que devolve HTML com metadados Open Graph em HTTP 200. O botao nessa pagina abre a versao interativa no GitHub Pages. A rota SPA antiga `/u/<username>` continua sujeita ao fallback HTTP 404 do Pages quando aberta diretamente.
 
 ## Backend (Supabase)
 
-Schema e RLS aplicados pela Migration API ou `supabase db push`; as migrations são
-append-only, nunca editadas depois de aplicadas. Edge Functions com
-`supabase functions deploy auth-accounts` e `supabase functions deploy bootstrap-admin`.
-Secrets do servidor (`ADMIN_SHARED_PASSWORD`, `ADMIN_BOOTSTRAP_SECRET`, `APP_ORIGIN`)
-definidos com `supabase secrets set`; `APP_ORIGIN` tem de ser exatamente a origem do
-frontend em uso.
+Aplica as migracoes pendentes com `supabase db push --linked --yes`. Se a CLI falhar a ligacao como `temp role`, usa a palavra-passe remota do Postgres pela variavel `SUPABASE_DB_PASSWORD`. No PowerShell, o bloco seguinte pede-a sem a mostrar, executa a migracao e limpa a variavel no fim:
+
+```powershell
+$dbPasswordSecure = Read-Host "Supabase database password" -AsSecureString
+$dbPasswordPtr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($dbPasswordSecure)
+try {
+  $env:SUPABASE_DB_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($dbPasswordPtr)
+  supabase db push --linked --yes
+} finally {
+  Remove-Item Env:SUPABASE_DB_PASSWORD -ErrorAction SilentlyContinue
+  [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($dbPasswordPtr)
+}
+```
+
+Se continuar a dar `Connection timed out`, verifica as restricoes de rede/IP do projeto e se a rede permite saida TCP para o pooler na porta 5432; tenta uma rede diferente se necessario. As migracoes criam a sincronizacao privada e as tabelas publicas da comunidade; desativam o portfolio administrativo antigo sem apagar as linhas guardadas.
+
+Publica as Edge Functions:
+
+```powershell
+supabase functions deploy auth-accounts
+supabase functions deploy bootstrap-admin
+supabase functions deploy mentor-chat
+supabase functions deploy public-profile
+```
+
+Configura a chave OpenRouter apenas como secret do servidor Supabase:
+
+```powershell
+supabase secrets set OPENROUTER_API_KEY="a-tua-chave" OPENROUTER_MODEL="openrouter/free"
+```
+
+A chave OpenRouter deve ficar apenas nos secrets do Supabase; nunca uses `VITE_OPENROUTER_API_KEY`. A funcao `mentor-chat` usa o endpoint Chat Completions compativel com OpenAI e, por omissao, o router gratuito `openrouter/free`. Os pedidos exigem fornecedores elegiveis a ZDR e sem recolha de dados, e as migracoes sao necessarias para ler o perfil privado de aprendizagem.

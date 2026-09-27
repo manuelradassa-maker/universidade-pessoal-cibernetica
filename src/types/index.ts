@@ -188,6 +188,8 @@ export interface UserProfile {
   avatar: string;
   avatarType: 'image' | 'emoji';
   learnerData: LearnerProfileData;
+  /** Respostas integrais aos 13 blocos do LEARNER PROFILE INPUT do V8. */
+  v8Intake?: Record<string, string>;
   evaluated: boolean;
   systemMode: 'normal' | 'modo_a_baixa_energia' | 'modo_b_falha_critica';
   createdAt: string;
@@ -332,6 +334,7 @@ export interface CommunityPost {
   id: string;
   authorId: string;
   authorName: string;
+  authorUsername?: string;
   authorAvatar: string;
   authorAvatarType: 'image' | 'emoji';
   authorEmail: string;

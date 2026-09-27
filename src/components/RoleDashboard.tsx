@@ -1,21 +1,12 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { AppRole, AppUser, invokeAccountAction, supabase } from '../lib/supabase';
-import { LogOut, Plus, RefreshCw, Check, X, Copy, ExternalLink, Trash2, GripVertical, Layers, Sparkles } from 'lucide-react';
+import { LogOut, Plus, RefreshCw, Check, X, Copy, Layers, Sparkles } from 'lucide-react';
 import { LearnerJourney } from './LearnerJourney';
 
 type Company = { id: string; name: string; owner_id: string; owner_role: AppRole; status: string; created_at: string };
 type Video = { id: string; title: string; url: string; company_id: string | null };
 type ManagedUser = { id: string; username: string; role: AppRole; status: string };
 type AccessCode = { id: string; code: string; role: AppRole; company_id: string | null; label: string | null; use_count: number; revoked_at: string | null; created_at: string };
-type PortfolioBlock = { id: string; type: 'text' | 'image' | 'video' | 'links' | 'list'; title?: string; body?: string; url?: string; items?: string[] };
-
-const toEmbedUrl = (url: string): string => {
-  const youtubeId = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w-]{11})/)?.[1];
-  if (youtubeId) return `https://www.youtube-nocookie.com/embed/${youtubeId}`;
-  const vimeoId = url.match(/vimeo\.com\/(?:video\/)?(\d+)/)?.[1];
-  if (vimeoId) return `https://player.vimeo.com/video/${vimeoId}`;
-  return url;
-};
 
 const inputClass = 'w-full rounded-lg border border-zinc-700 bg-black/50 px-3 py-2 text-sm text-white outline-none focus:border-red-500';
 const buttonClass = 'inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 transition hover:border-red-500 disabled:opacity-50';
@@ -72,34 +63,6 @@ export function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: AppUse
   </main>;
 }
 
-export function PublicPortfolio({ username }: { username: string }) {
-  const [portfolio, setPortfolio] = useState<{ username: string; content: PortfolioBlock[] } | null>(null);
-  const [error, setError] = useState(supabase ? '' : 'Supabase não está configurado.');
-  useEffect(() => {
-    if (!supabase) return;
-    void supabase.rpc('get_public_admin_portfolio', { p_username: username }).then(({ data, error: rpcError }) => {
-      if (rpcError || !data) setError('Portfólio não encontrado.');
-      else setPortfolio(data as { username: string; content: PortfolioBlock[] });
-    });
-  }, [username]);
-  return <main className="min-h-screen bg-[#09090d] px-5 py-12 text-white"><article className="mx-auto max-w-4xl">
-    {error ? <p>{error}</p> : !portfolio ? <p>A carregar portfólio...</p> : <>
-      <header className="mb-10 border-b border-zinc-800 pb-6"><p className="font-mono text-xs uppercase text-red-400">Portfólio profissional</p><h1 className="mt-2 text-4xl font-bold">{portfolio.username}</h1></header>
-      <div className="space-y-8">{portfolio.content.map((block) => <PortfolioBlockView key={block.id} block={block} />)}</div>
-    </>}
-  </article></main>;
-}
-
-function PortfolioBlockView({ block }: { block: PortfolioBlock }) {
-  const embedUrl = toEmbedUrl(block.url || '');
-  const canEmbed = embedUrl.includes('youtube-nocookie.com/embed/') || embedUrl.includes('player.vimeo.com/video/');
-  if (block.type === 'image') return <figure>{block.title && <h2 className="mb-3 text-xl font-semibold">{block.title}</h2>}<img className="max-h-[70vh] rounded-lg object-contain" src={block.url} alt={block.title || ''} /></figure>;
-  if (block.type === 'video') return <section><h2 className="mb-3 text-xl font-semibold">{block.title}</h2>{canEmbed ? <iframe title={block.title || 'Vídeo'} src={embedUrl} className="aspect-video w-full rounded-lg" allowFullScreen /> : <a className="text-red-300 underline" href={block.url} target="_blank" rel="noreferrer">Ver vídeo</a>}</section>;
-  if (block.type === 'links') return <section><h2 className="mb-3 text-xl font-semibold">{block.title}</h2><ul className="space-y-2">{(block.items || []).map((item) => { const [name, url] = item.split('|'); return <li key={item}><a className="text-red-300 underline" href={url} target="_blank" rel="noreferrer">{name || url}</a></li>; })}</ul></section>;
-  if (block.type === 'list') return <section><h2 className="mb-3 text-xl font-semibold">{block.title}</h2><ul className="list-inside list-disc space-y-1 text-zinc-300">{(block.items || []).map((item) => <li key={item}>{item}</li>)}</ul></section>;
-  return <section><h2 className="mb-2 text-2xl font-semibold">{block.title}</h2><p className="whitespace-pre-wrap leading-7 text-zinc-300">{block.body}</p></section>;
-}
-
 export function RoleDashboard({ user, onLogout }: { user: AppUser; onLogout: () => void }) {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [videos, setVideos] = useState<Video[]>([]);
@@ -112,7 +75,6 @@ export function RoleDashboard({ user, onLogout }: { user: AppUser; onLogout: () 
   const [newRole, setNewRole] = useState<'partner' | 'student'>('partner');
   const [studentCompany, setStudentCompany] = useState('');
   const [temporaryPassword, setTemporaryPassword] = useState('');
-  const [portfolio, setPortfolio] = useState<PortfolioBlock[]>([]);
   const [accessCodes, setAccessCodes] = useState<AccessCode[]>([]);
   const [codeCompany, setCodeCompany] = useState('');
   const [codeRole, setCodeRole] = useState<'partner' | 'student' | 'admin'>('student');
@@ -141,14 +103,6 @@ export function RoleDashboard({ user, onLogout }: { user: AppUser; onLogout: () 
     const timeout = window.setTimeout(() => setTemporaryPassword(''), 60_000);
     return () => window.clearTimeout(timeout);
   }, [temporaryPassword]);
-  useEffect(() => {
-    if (user.role !== 'admin' || !supabase) return;
-    void (async () => {
-      const { data } = await supabase.from('admin_portfolios').select('content').eq('admin_id', user.id).maybeSingle();
-      if (data?.content) setPortfolio(data.content as PortfolioBlock[]);
-    })();
-  }, [user.id, user.role]);
-
   const run = async (operation: () => Promise<void>) => {
     setBusy(true); setError(''); setNotice(''); setTemporaryPassword('');
     try { await operation(); await loadData(); }
@@ -227,38 +181,9 @@ export function RoleDashboard({ user, onLogout }: { user: AppUser; onLogout: () 
     setTemporaryPassword(result.password); setNotice('Nova senha temporária criada. Copie agora; não será mostrada novamente.');
   });
 
-  const savePortfolio = () => void run(async () => {
-    if (!supabase) throw new Error('Supabase não está configurado.');
-    const { error: saveError } = await supabase.from('admin_portfolios').upsert({ admin_id: user.id, content: portfolio, updated_at: new Date().toISOString() }, { onConflict: 'admin_id' });
-    if (saveError) throw saveError;
-    setNotice('Portfólio guardado.');
-  });
-
-  const uploadPortfolioImage = (file?: File) => {
-    if (!file) return;
-    void run(async () => {
-      if (!supabase) throw new Error('Supabase não está configurado.');
-      if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type) || file.size > 5 * 1024 * 1024) {
-        throw new Error('Escolha uma imagem PNG, JPEG, WEBP ou GIF até 5 MB.');
-      }
-      const extension = file.name.split('.').pop()?.toLowerCase() || 'img';
-      const path = `${user.id}/${crypto.randomUUID()}.${extension}`;
-      const { error: uploadError } = await supabase.storage.from('admin-portfolio').upload(path, file, { upsert: false });
-      if (uploadError) throw uploadError;
-      const { data } = supabase.storage.from('admin-portfolio').getPublicUrl(path);
-      setPortfolio((blocks) => [...blocks, { id: crypto.randomUUID(), type: 'image', title: file.name, url: data.publicUrl }]);
-      setNotice('Imagem adicionada ao portfólio. Guarde as alterações para publicar.');
-    });
-  };
-
-  const addBlock = (type: PortfolioBlock['type']) => setPortfolio((blocks) => [...blocks, { id: crypto.randomUUID(), type, title: '', body: '', url: '', items: [] }]);
-  const updateBlock = (id: string, patch: Partial<PortfolioBlock>) => setPortfolio((blocks) => blocks.map((block) => block.id === id ? { ...block, ...patch } : block));
-  const moveBlock = (from: number, to: number) => setPortfolio((blocks) => { const next = [...blocks]; const [block] = next.splice(from, 1); next.splice(to, 0, block); return next; });
-
   const canCreateStudent = user.role === 'partner' || user.role === 'admin';
   const ownedApprovedCompanies = companies.filter((company) => company.owner_id === user.id && company.status === 'approved');
   const roleLabel = user.role === 'admin' ? 'Admin' : user.role === 'partner' ? 'Partner' : 'Student';
-  const publicPortfolioUrl = `${window.location.origin}${import.meta.env.BASE_URL}portfolio/${encodeURIComponent(user.username)}`;
 
   return <div className="min-h-screen bg-[#09090d] text-white">
     <header className="border-b border-zinc-800 bg-black/60 px-5 py-4">
@@ -319,9 +244,7 @@ export function RoleDashboard({ user, onLogout }: { user: AppUser; onLogout: () 
 
       {user.role !== 'student' && <section className="space-y-3 border-b border-zinc-800 pb-8"><h2 className="text-lg font-semibold">Contas geridas</h2>{managedUsers.filter((account) => account.id !== user.id).map((account) => <div key={account.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 py-2"><span>{account.username} <span className="ml-2 text-xs uppercase text-zinc-500">{account.role} · {account.status}</span></span><button className={buttonClass} onClick={() => resetPassword(account.id)}><RefreshCw size={15} /> Gerar nova senha</button></div>)}</section>}
 
-      {user.role === 'admin' && <section className="space-y-4 border-b border-zinc-800 pb-8"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold">Portfólio público</h2><a href={publicPortfolioUrl} target="_blank" rel="noreferrer" className="text-sm text-red-300 underline">{publicPortfolioUrl} <ExternalLink className="inline" size={13} /></a></div><button onClick={savePortfolio} className={primaryClass} disabled={busy}>Guardar portfólio</button></div><div className="flex flex-wrap gap-2">{(['text', 'image', 'video', 'links', 'list'] as const).map((type) => <button key={type} onClick={() => addBlock(type)} className={buttonClass}><Plus size={15} /> {type === 'text' ? 'Texto' : type === 'image' ? 'Imagem' : type === 'video' ? 'Vídeo' : type === 'links' ? 'Links' : 'Lista'}</button>)}</div><div className="space-y-3">{portfolio.map((block, index) => <div key={block.id} draggable onDragStart={(event) => event.dataTransfer.setData('text/plain', String(index))} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const from = Number(event.dataTransfer.getData('text/plain')); if (Number.isInteger(from)) moveBlock(from, index); }} className="space-y-2 rounded-lg border border-zinc-800 bg-black/30 p-4"><div className="flex items-center justify-between text-xs uppercase text-zinc-500"><span><GripVertical className="mr-2 inline" size={15} />{block.type}</span><button className="text-red-300" onClick={() => setPortfolio((blocks) => blocks.filter((entry) => entry.id !== block.id))} title="Remover bloco"><Trash2 size={15} /></button></div><input className={inputClass} placeholder="Título" value={block.title || ''} onChange={(event) => updateBlock(block.id, { title: event.target.value })} />{block.type === 'text' ? <textarea className={inputClass} rows={4} placeholder="Texto" value={block.body || ''} onChange={(event) => updateBlock(block.id, { body: event.target.value })} /> : block.type === 'image' || block.type === 'video' ? <input className={inputClass} placeholder="URL da imagem ou vídeo" value={block.url || ''} onChange={(event) => updateBlock(block.id, { url: event.target.value })} /> : <textarea className={inputClass} rows={4} placeholder={block.type === 'links' ? 'Um por linha: Nome|https://url' : 'Um item por linha'} value={(block.items || []).join('\n')} onChange={(event) => updateBlock(block.id, { items: event.target.value.split('\n').filter(Boolean) })} />}</div>)}</div></section>}
 
-      {user.role === 'admin' && <section className="border-b border-zinc-800 pb-8"><label className={`${buttonClass} cursor-pointer`}><Plus size={15} /> Carregar imagem para o portfólio<input className="sr-only" type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(event) => { uploadPortfolioImage(event.target.files?.[0]); event.currentTarget.value = ''; }} /></label><p className="mt-2 text-xs text-zinc-500">PNG, JPEG, WEBP ou GIF até 5 MB. A imagem fica pública no portfólio.</p></section>}
       <section><h2 className="mb-3 text-lg font-semibold">{user.role === 'student' ? 'Conteúdo da empresa' : 'Vídeos disponíveis'}</h2><div className="grid gap-3 md:grid-cols-2">{videos.map((video) => <article key={video.id} className="rounded-lg border border-zinc-800 p-4"><h3 className="font-semibold">{video.title}</h3><a className="mt-2 inline-block text-sm text-red-300 underline" href={video.url} target="_blank" rel="noreferrer">Abrir vídeo</a></article>)}{videos.length === 0 && <p className="text-sm text-zinc-500">Ainda não há vídeos disponíveis.</p>}</div></section>
       </>}
     </main>
