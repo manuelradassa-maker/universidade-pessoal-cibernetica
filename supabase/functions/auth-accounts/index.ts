@@ -50,9 +50,8 @@ Deno.serve(async (request) => {
         return json({ error: 'Código inválido, expirado ou revogado.' }, 400);
       }
 
-      // Admins created through a code keep the password they choose: only the
-      // bootstrap admin shares ADMIN_SHARED_PASSWORD, and the login flow
-      // honours that distinction via `created_by`.
+      // Every account, including admins, keeps the password chosen at signup.
+      // The invite code grants the role; passwords are always personal.
       // A student code must still point at an approved company at signup time.
       if (invite.role === 'student') {
         const { data: company } = await service
@@ -74,9 +73,8 @@ Deno.serve(async (request) => {
 
       const { error: profileError } = await service.from('users').insert({
         id: created.user.id, username, role: invite.role,
-        // Attribute the account to whoever minted the code. `created_by`
-        // being non-null is also how login tells a code-created admin apart
-        // from the bootstrap admin, so this field is load-bearing.
+        // Attribute the account to whoever minted the code for management
+        // and audit purposes.
         created_by: invite.created_by, status: 'active',
       });
       if (profileError) {
@@ -134,23 +132,6 @@ Deno.serve(async (request) => {
       if (!account || account.status !== 'active') {
         await recordAttempts(keys, false);
         return json({ error: 'Credenciais inválidas.' }, 401);
-      }
-
-      if (account.role === 'admin') {
-        // The bootstrap admin keeps sharing ADMIN_SHARED_PASSWORD. Admins
-        // created later have their own password, so the shared password must
-        // not overwrite theirs on every login. `created_by` is null only for
-        // the bootstrap admin.
-        const isBootstrapAdmin = account.created_by === null;
-        if (isBootstrapAdmin) {
-          const sharedPassword = Deno.env.get('ADMIN_SHARED_PASSWORD');
-          if (!sharedPassword || password !== sharedPassword) {
-            await recordAttempts(keys, false);
-            return json({ error: 'Credenciais inválidas.' }, 401);
-          }
-          const { error: resetError } = await service.auth.admin.updateUserById(account.id, { password: sharedPassword });
-          if (resetError) throw new Error(`reset-admin-password: ${resetError.message}`);
-        }
       }
 
       // Sign in as the end user, NOT as service_role: a service_role client is
@@ -296,6 +277,19 @@ Deno.serve(async (request) => {
         }
       }
       return json({ username, password, role });
+    }
+
+    if (action === 'change-password') {
+      const currentPassword = String(body.current_password ?? '');
+      const newPassword = String(body.new_password ?? '');
+      if (newPassword.length < 8) return json({ error: 'A nova senha precisa de pelo menos 8 caracteres.' }, 400);
+      const { error: verifyError } = await anonClient().auth.signInWithPassword({
+        email: syntheticEmail(caller.username), password: currentPassword,
+      });
+      if (verifyError) return json({ error: 'A senha atual está incorreta.' }, 401);
+      const { error: updateError } = await service.auth.admin.updateUserById(caller.id, { password: newPassword });
+      if (updateError) return json({ error: updateError.message }, 400);
+      return json({ success: true });
     }
 
     if (action === 'reset-password') {

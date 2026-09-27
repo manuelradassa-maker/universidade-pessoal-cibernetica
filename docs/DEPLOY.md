@@ -28,7 +28,7 @@ commit bom, ou `gh run rerun <id>` de um run anterior bem-sucedido.
 
 Variáveis `VITE_` são substituídas em tempo de **build**, não em runtime: um build
 sem `.env` produz um site que mostra apenas "Supabase não está configurado". Nunca
-colocar `service_role`, `ADMIN_SHARED_PASSWORD` nem `ADMIN_BOOTSTRAP_SECRET` em
+colocar `service_role` nem `ADMIN_BOOTSTRAP_SECRET` em
 variáveis `VITE_` — o bundle é público.
 
 Perfis partilhados usam agora a Edge Function `public-profile`, que devolve HTML com metadados Open Graph em HTTP 200. O botao nessa pagina abre a versao interativa no GitHub Pages. A rota SPA antiga `/u/<username>` continua sujeita ao fallback HTTP 404 do Pages quando aberta diretamente.

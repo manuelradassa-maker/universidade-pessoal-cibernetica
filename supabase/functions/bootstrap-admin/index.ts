@@ -5,8 +5,7 @@ Deno.serve(async (request) => {
   if (request.method !== 'POST') return json({ error: 'Método não permitido.' }, 405);
 
   const expectedSecret = Deno.env.get('ADMIN_BOOTSTRAP_SECRET');
-  const password = Deno.env.get('ADMIN_SHARED_PASSWORD');
-  if (!expectedSecret || !password || request.headers.get('x-bootstrap-secret') !== expectedSecret) {
+  if (!expectedSecret || request.headers.get('x-bootstrap-secret') !== expectedSecret) {
     return json({ error: 'Não autorizado.' }, 401);
   }
 
@@ -16,6 +15,8 @@ Deno.serve(async (request) => {
     const body = await request.json();
     const username = String(body.username ?? '').trim().toLowerCase();
     if (!/^[a-zA-Z0-9_.-]{3,32}$/.test(username)) return json({ error: 'Username inválido.' }, 400);
+    const password = String(body.password ?? '');
+    if (password.length < 8) return json({ error: 'A senha pessoal deve ter pelo menos 8 caracteres.' }, 400);
     const { data: claim, error: claimError } = await service.rpc('claim_initial_admin_bootstrap');
     if (claimError) throw claimError;
     if (!claim) return json({ error: 'O bootstrap inicial já foi utilizado ou já existe um admin.' }, 409);

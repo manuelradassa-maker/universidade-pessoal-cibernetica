@@ -78,6 +78,8 @@ export function RoleDashboard({ user, onLogout }: { user: AppUser; onLogout: () 
   const [accessCodes, setAccessCodes] = useState<AccessCode[]>([]);
   const [codeCompany, setCodeCompany] = useState('');
   const [codeRole, setCodeRole] = useState<'partner' | 'student' | 'admin'>('student');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -203,6 +205,13 @@ export function RoleDashboard({ user, onLogout }: { user: AppUser; onLogout: () 
       {notice && <p role="status" className="rounded-lg border border-emerald-800 bg-emerald-950/50 p-3 text-sm text-emerald-200">{notice}</p>}
       {temporaryPassword && <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-700 bg-amber-950/50 p-4"><p><span className="block text-xs uppercase text-amber-300">Senha temporária, visível apenas agora</span><code className="text-lg font-bold tracking-widest">{temporaryPassword}</code></p><span className="flex gap-2"><button className={buttonClass} onClick={() => void navigator.clipboard.writeText(temporaryPassword)}><Copy size={15} /> Copiar</button><button className={buttonClass} onClick={() => setTemporaryPassword('')} aria-label="Ocultar senha temporária"><X size={15} /></button></span></div>}
 
+      <form onSubmit={(event) => { event.preventDefault(); void run(async () => { await invokeAccountAction({ action: 'change-password', current_password: currentPassword, new_password: newPassword }); setCurrentPassword(''); setNewPassword(''); setNotice('A tua senha pessoal foi atualizada.'); }); }} className="max-w-xl space-y-3 border-b border-zinc-800 pb-6">
+        <h2 className="text-lg font-semibold">Alterar a minha senha pessoal</h2>
+        <input required type="password" autoComplete="current-password" className={inputClass} placeholder="Senha atual" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
+        <input required minLength={8} type="password" autoComplete="new-password" className={inputClass} placeholder="Nova senha (m?nimo 8 caracteres)" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />
+        <button className={primaryClass} disabled={busy}><Check size={16} /> Guardar senha</button>
+      </form>
+
       {user.role !== 'student' && <section className="grid gap-8 lg:grid-cols-2">
         <form onSubmit={createCompany} className="space-y-3 border-b border-zinc-800 pb-6"><h2 className="text-lg font-semibold">{user.role === 'admin' ? 'Criar empresa' : 'Pedir aprovação de empresa'}</h2><div className="flex gap-2"><input required minLength={2} maxLength={120} className={inputClass} placeholder="Nome da empresa" value={companyName} onChange={(event) => setCompanyName(event.target.value)} /><button className={primaryClass} disabled={busy}><Plus size={16} /> Criar</button></div></form>
         <section><h2 className="mb-3 text-lg font-semibold">Empresas</h2><div className="space-y-2">{companies.map((company) => <div key={company.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 py-2"><span>{company.name} <span className="ml-2 text-xs uppercase text-zinc-400">{company.status}</span></span>{user.role === 'admin' && company.owner_role === 'partner' && company.status === 'pending' && <span className="flex gap-2"><button className={buttonClass} onClick={() => reviewCompany(company.id, 'approved')}><Check size={15} /> Aprovar</button><button className={buttonClass} onClick={() => reviewCompany(company.id, 'rejected')}><X size={15} /> Rejeitar</button></span>}</div>)}{companies.length === 0 && <p className="text-sm text-zinc-500">Sem empresas acessíveis.</p>}</div></section>
@@ -221,7 +230,7 @@ export function RoleDashboard({ user, onLogout }: { user: AppUser; onLogout: () 
             {user.role === 'admin' && <option value="partner">Partner</option>}
             {user.role === 'admin' && <option value="admin">Administrador</option>}
           </select>
-          {codeRole === 'admin' && <p className="rounded-lg border border-amber-700 bg-amber-950 p-3 text-xs text-amber-200">Um código de administrador não basta: a pessoa também tem de receber a senha partilhada dos admins. Entrega as duas.</p>}
+          {codeRole === 'admin' && <p className="rounded-lg border border-amber-700 bg-amber-950 p-3 text-xs text-amber-200">O codigo de administrador e partilhado. Cada pessoa cria a conta com o seu proprio username e senha.</p>}
           {codeRole === 'student' && <select required className={inputClass} value={codeCompany} onChange={(event) => setCodeCompany(event.target.value)}>
             <option value="">Escolher empresa aprovada</option>
             {ownedApprovedCompanies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}
