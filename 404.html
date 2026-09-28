@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Universidade Pessoal Cibernética</title>
+    <script>
+      const base = '/universidade-pessoal-cibernetica/';
+      const requested = location.pathname + location.search + location.hash;
+      location.replace(base + '?__redirect=' + encodeURIComponent(requested));
+    </script>
+  </head>
+  <body></body>
+</html>
