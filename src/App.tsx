@@ -33,13 +33,13 @@ export function App() {
         return;
       }
       const { data, error } = await client.from('users')
-        .select('id, username, role, status, created_by').eq('id', session.user.id).single();
+        .select('id, username, status, created_by').eq('id', session.user.id).single();
       if (!active) return;
       if (error || !data || data.status !== 'active') {
         await client.auth.signOut();
         setUser(null);
       } else {
-        setUser(data as AppUser);
+        setUser({ ...(data as AppUser), email: session.user.email ?? undefined });
       }
       setLoading(false);
     };

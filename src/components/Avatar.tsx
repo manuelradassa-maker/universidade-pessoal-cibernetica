@@ -27,7 +27,7 @@ export const Avatar: React.FC<{
   return (
     <div
       className={`${dims} rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0 font-bold ${
-        ring ? 'border border-red-600/50 bg-red-950/60' : 'bg-zinc-800'
+        ring ? 'border border-violet-600/50 bg-violet-950/60' : 'bg-zinc-800'
       }`}
       title={name}
       aria-label={`Foto de perfil de ${name}`}
@@ -38,7 +38,7 @@ export const Avatar: React.FC<{
       ) : avatar ? (
         <span aria-hidden="true">{avatar}</span>
       ) : (
-        <span className="text-red-300">{initials || '?'}</span>
+        <span className="text-violet-300">{initials || '?'}</span>
       )}
     </div>
   );
@@ -124,7 +124,7 @@ export const AvatarPicker: React.FC<{
             type="button"
             disabled={busy}
             onClick={() => fileRef.current?.click()}
-            className="px-4 py-2 rounded-xl bg-red-950/60 hover:bg-red-900 border border-red-600/60 text-red-200 text-xs font-mono font-semibold transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 min-h-[44px]"
+            className="px-4 py-2 rounded-xl bg-violet-950/60 hover:bg-violet-900 border border-violet-600/60 text-violet-200 text-xs font-mono font-semibold transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 min-h-[44px]"
           >
             {busy ? (
               <RotateCcw className="w-4 h-4 animate-spin" />
@@ -141,7 +141,7 @@ export const AvatarPicker: React.FC<{
       </div>
       {error && (
         <div
-          className="p-2.5 rounded-lg bg-red-950/80 border border-red-600 text-red-200 text-xs font-mono flex items-center gap-2"
+          className="p-2.5 rounded-lg bg-violet-950/80 border border-violet-600 text-violet-200 text-xs font-mono flex items-center gap-2"
           role="alert"
         >
           <AlertTriangle className="w-4 h-4 flex-shrink-0" />
@@ -160,7 +160,7 @@ export const AvatarPicker: React.FC<{
               onClick={() => onChange(emoji, 'emoji')}
               aria-label={'Escolher simbolo ' + emoji}
               className={'h-11 rounded-lg border text-xl transition-all cursor-pointer ' + (avatar === emoji && avatarType === 'emoji'
-                ? 'bg-red-950 border-red-500 shadow-md shadow-red-900/50'
+                ? 'bg-violet-950 border-violet-500 shadow-md shadow-violet-900/50'
                 : 'bg-black/60 border-zinc-800 hover:border-zinc-600')}
             >
               {emoji}

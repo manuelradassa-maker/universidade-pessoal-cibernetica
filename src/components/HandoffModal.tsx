@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { UserProfile, PracticalPhase, PillarInfo } from '../types';
 import { Copy, Check, X, FileText } from 'lucide-react';
 
@@ -66,10 +66,10 @@ ${pillars
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
-      <div className="relative w-full max-w-2xl p-6 md:p-8 bg-[#0b0b12] border-2 border-red-600/50 rounded-2xl shadow-2xl cyber-glow-red overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="relative w-full max-w-2xl p-6 md:p-8 bg-[#0b0b12] border-2 border-violet-600/50 rounded-2xl shadow-2xl cyber-glow-red overflow-hidden flex flex-col max-h-[90vh]">
         <div className="flex items-center justify-between border-b border-zinc-800 pb-4 mb-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-red-950 border border-red-500/50 text-red-400">
+            <div className="p-2 rounded-lg bg-violet-950 border border-violet-500/50 text-violet-400">
               <FileText className="w-5 h-5" />
             </div>
             <div>
@@ -104,7 +104,7 @@ ${pillars
           <button
             type="button"
             onClick={handleCopy}
-            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white text-xs font-mono font-semibold shadow-lg shadow-red-950 flex items-center gap-2"
+            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-violet-700 hover:from-violet-500 hover:to-violet-600 text-white text-xs font-mono font-semibold shadow-lg shadow-violet-950 flex items-center gap-2"
           >
             {copied ? <Check className="w-4 h-4 text-emerald-300" /> : <Copy className="w-4 h-4" />}
             {copied ? 'Copiado com Sucesso' : 'Copiar Handoff Markdown'}

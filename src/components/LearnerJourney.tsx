@@ -33,8 +33,8 @@ const TABS: { id: TabId; label: string; icon: typeof Compass }[] = [
   { id: 'auditoria', label: 'Auditoria', icon: ShieldCheck },
 ];
 
-const actionClass = 'inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs text-zinc-100 transition hover:border-red-500';
-const accentClass = 'inline-flex items-center gap-2 rounded-lg bg-red-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-red-600';
+const actionClass = 'inline-flex items-center gap-2 rounded-xl border border-violet-100 bg-white px-3 py-2 text-xs text-violet-800 transition hover:border-violet-300';
+const accentClass = 'inline-flex items-center gap-2 rounded-xl bg-violet-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-800';
 
 export function LearnerJourney({ user }: { user: AppUser }) {
   const [state, setState] = useState<LearnerState>(() => loadLearnerState(user));
@@ -117,9 +117,9 @@ export function LearnerJourney({ user }: { user: AppUser }) {
   const mentor = <MentorChat user={profile} activeBottleneck={activeBottleneck} messages={state.mentorMessages} onMessagesChange={(mentorMessages) => setState((previous) => ({ ...previous, mentorMessages }))} onUpdateUserMode={setSystemMode} onGenerateHandoff={() => setShowHandoff(true)} />;
 
   return <div className="space-y-6">
-    <section className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-black/40 p-4">
+    <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-violet-100 bg-white p-4 shadow-sm">
       <div>
-        <p className="font-mono text-xs uppercase text-red-400">Minha jornada</p>
+        <p className="font-mono text-xs uppercase tracking-wider text-violet-700">Minha jornada</p>
         <h2 className="text-lg font-semibold">{profile.avatar} {profile.name}</h2>
         <p className="text-xs text-zinc-500">{profile.evaluated ? 'Perfil de leitor avaliado' : 'Diagnóstico do leitor por concluir'} · {state.reviews.length} {state.reviews.length === 1 ? 'revisão' : 'revisões'} registadas</p>
         <span className="mt-1 inline-block text-[11px] text-zinc-500">{syncStatus === 'synced' ? 'Sincronizado' : syncStatus === 'syncing' ? 'A sincronizar' : 'Guardado neste dispositivo'}</span>
@@ -133,12 +133,12 @@ export function LearnerJourney({ user }: { user: AppUser }) {
     </section>
 
     {profile.systemMode === 'modo_a_baixa_energia' && <p className="rounded-lg border border-amber-700 bg-amber-950/60 p-3 text-sm text-amber-200">Modo A ativo: output reduzido ao essencial. Escolhe uma única ação física de 10 minutos para hoje.</p>}
-    {profile.systemMode === 'modo_b_falha_critica' && <p className="rounded-lg border border-red-700 bg-red-950/70 p-3 text-sm text-red-200">Modo B ativo: o currículo está em pausa. Procura apoio humano imediato — a tua integridade vem antes de qualquer objetivo.</p>}
+    {profile.systemMode === 'modo_b_falha_critica' && <p className="rounded-lg border border-violet-700 bg-violet-950/70 p-3 text-sm text-violet-200">Modo B ativo: o currículo está em pausa. Procura apoio humano imediato — a tua integridade vem antes de qualquer objetivo.</p>}
 
     {!profile.evaluated && <section className="rounded-xl border border-amber-800/60 bg-amber-950/20 p-4 text-sm text-amber-100">Completa o diagnostico V8 antes de ver uma fase personalizada ou registar progresso.</section>}
 
-    <nav className="flex flex-wrap gap-2 border-b border-zinc-800 pb-3">
-      {TABS.map((entry) => <button key={entry.id} onClick={() => setTab(entry.id)} className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition ${tab === entry.id ? 'bg-red-700 text-white' : 'border border-zinc-800 text-zinc-400 hover:text-white'}`}><entry.icon size={15} /> {entry.label}</button>)}
+    <nav className="flex flex-wrap gap-2 border-b border-violet-100 pb-3">
+      {TABS.map((entry) => <button key={entry.id} onClick={() => setTab(entry.id)} className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition ${tab === entry.id ? 'bg-violet-700 text-white' : 'border border-violet-100 bg-white text-slate-600 hover:border-violet-300 hover:text-violet-800'}`}><entry.icon size={15} /> {entry.label}</button>)}
     </nav>
 
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">

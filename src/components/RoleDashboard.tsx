@@ -1,260 +1,211 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
-import { AppRole, AppUser, invokeAccountAction, supabase } from '../lib/supabase';
-import { LogOut, Plus, RefreshCw, Check, X, Copy, Layers, Sparkles } from 'lucide-react';
+import { AppUser, invokeAccountAction, supabase } from '../lib/supabase';
+import { LogOut, Plus, RefreshCw, Check, Layers, Sparkles, Clapperboard } from 'lucide-react';
 import { LearnerJourney } from './LearnerJourney';
+import { GroupsPanel } from './GroupsPanel';
 
-type Company = { id: string; name: string; owner_id: string; owner_role: AppRole; status: string; created_at: string };
-type Video = { id: string; title: string; url: string; company_id: string | null };
-type ManagedUser = { id: string; username: string; role: AppRole; status: string };
-type AccessCode = { id: string; code: string; role: AppRole; company_id: string | null; label: string | null; use_count: number; revoked_at: string | null; created_at: string };
+type Company = { id: string; name: string; owner_id: string; status: string; created_at: string };
+type Video = { id: string; title: string; url: string; company_id: string | null; is_short: boolean };
 
-const inputClass = 'w-full rounded-lg border border-zinc-700 bg-black/50 px-3 py-2 text-sm text-white outline-none focus:border-red-500';
-const buttonClass = 'inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 transition hover:border-red-500 disabled:opacity-50';
-const primaryClass = 'inline-flex items-center justify-center gap-2 rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-red-600 disabled:opacity-50';
+const inputClass = 'w-full rounded-xl border border-violet-100 bg-white px-3.5 py-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-violet-400 focus:ring-2 focus:ring-violet-100';
+const buttonClass = 'inline-flex items-center justify-center gap-2 rounded-xl border border-violet-100 bg-white px-3 py-2 text-sm text-violet-800 transition hover:border-violet-300 disabled:opacity-50';
+const primaryClass = 'inline-flex items-center justify-center gap-2 rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-800 disabled:opacity-50';
 
 export function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: AppUser) => void }) {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [code, setCode] = useState('');
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
 
   const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    setBusy(true);
-    setError('');
+    event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
-      if (!supabase) throw new Error('Define VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY para ativar a autenticação.');
-      const response = mode === 'login'
-        ? await invokeAccountAction<{ session: { access_token: string; refresh_token: string }; user: AppUser }>({
-            action: 'login', username, password,
-          })
-        : await invokeAccountAction<{ session: { access_token: string; refresh_token: string }; user: AppUser }>({
-            action: 'redeem-code', code, username, password,
-          });
-      const { error: sessionError } = await supabase.auth.setSession(response.session);
-      if (sessionError) throw sessionError;
-      onAuthenticated(response.user);
+      if (!supabase) throw new Error('A autenticação ainda não está configurada.');
+      if (mode === 'signup') {
+        const { data, error: signupError } = await supabase.auth.signUp({
+          email: email.trim().toLowerCase(), password,
+          options: { data: { username: username.trim().toLowerCase(), registration_method: 'email' } },
+        });
+        if (signupError) {
+          if (signupError.message.toLowerCase().includes('username')) throw new Error('Esse nome de utilizador já está em uso. Escolhe outro.');
+          throw signupError;
+        }
+        if (!data.session) {
+          setNotice('Conta criada. Confirma o email que enviámos e depois inicia sessão.');
+          setMode('login'); return;
+        }
+        if (!data.user) throw new Error('Não foi possível encontrar a conta criada.');
+        const { data: profile, error: profileError } = await supabase.from('users')
+          .select('id, username, status, created_by').eq('id', data.user.id).single();
+        if (profileError || !profile) throw new Error('A conta foi criada, mas o perfil ainda não ficou pronto. Confirma o email e inicia sessão.');
+        onAuthenticated({ ...(profile as AppUser), email: data.user.email ?? undefined });
+      } else if (email.includes('@')) {
+        const { data, error: loginError } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
+        if (loginError || !data.user) throw new Error('Email ou palavra-passe incorretos.');
+        const { data: profile, error: profileError } = await supabase.from('users')
+          .select('id, username, status, created_by').eq('id', data.user.id).single();
+        if (profileError || !profile || profile.status !== 'active') {
+          await supabase.auth.signOut();
+          throw new Error('Não foi possível abrir o perfil desta conta. Confirma o email ou contacta o suporte.');
+        }
+        onAuthenticated({ ...(profile as AppUser), email: data.user.email ?? undefined });
+      } else {
+        // Compatibilidade com contas antigas criadas antes do registo por email.
+        const response = await invokeAccountAction<{ session: { access_token: string; refresh_token: string }; user: AppUser }>({ action: 'login', username: email, password });
+        const { error: sessionError } = await supabase.auth.setSession(response.session);
+        if (sessionError) throw sessionError;
+        onAuthenticated(response.user);
+      }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Não foi possível iniciar sessão.');
-    } finally {
-      setBusy(false);
-    }
+    } finally { setBusy(false); }
   };
 
-  const tabClass = (active: boolean) =>
-    `flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition ${active ? 'bg-red-700 text-white' : 'text-zinc-400 hover:text-white'}`;
-
-  return <main className="flex min-h-screen items-center justify-center bg-black px-4 py-8 text-white">
-    <form onSubmit={submit} className="w-full max-w-md space-y-5 rounded-2xl border border-red-900 bg-[#0d0d12] p-7 shadow-2xl">
-      <div className="text-center"><p className="mb-2 font-mono text-xs uppercase text-red-400">Universidade Pessoal Cibernética</p><h1 className="text-2xl font-bold">{mode === 'login' ? 'Iniciar sessão' : 'Criar conta'}</h1></div>
-      <div className="flex gap-2 rounded-xl bg-black/40 p-1">
-        <button type="button" onClick={() => { setMode('login'); setError(''); }} className={tabClass(mode === 'login')}>Entrar</button>
-        <button type="button" onClick={() => { setMode('signup'); setError(''); }} className={tabClass(mode === 'signup')}>Criar conta</button>
+  const tabClass = (active: boolean) => `flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition ${active ? 'bg-violet-700 text-white' : 'text-slate-500 hover:text-violet-800'}`;
+  return <main className="auth-screen flex min-h-screen items-center justify-center bg-[#f7f5ff] px-4 py-8 text-slate-900">
+    <form onSubmit={submit} className="w-full max-w-md space-y-5 rounded-3xl border border-violet-100 bg-white p-7 shadow-[0_24px_80px_-32px_rgba(91,33,182,.28)]">
+      <div className="text-center"><p className="mb-2 font-mono text-xs uppercase text-violet-700">Universidade Pessoal Cibernética</p><h1 className="text-2xl font-bold">{mode === 'login' ? 'Iniciar sessão' : 'Criar conta'}</h1><p className="mt-2 text-sm text-slate-500">Aprende, partilha e evolui ao teu ritmo.</p></div>
+      <div className="flex gap-2 rounded-xl bg-violet-50 p-1">
+        <button type="button" onClick={() => { setMode('login'); setError(''); setNotice(''); }} className={tabClass(mode === 'login')}>Entrar</button>
+        <button type="button" onClick={() => { setMode('signup'); setError(''); setNotice(''); }} className={tabClass(mode === 'signup')}>Criar conta</button>
       </div>
-      {mode === 'signup' && <p className="rounded-lg border border-zinc-700 bg-black/40 p-3 text-sm text-zinc-400">Tens um código de acesso? Escolhe aqui o teu username e a tua senha.</p>}
-      {error && <p role="alert" className="rounded-lg border border-red-700 bg-red-950 p-3 text-sm text-red-200">{error}</p>}
-      {mode === 'signup' && <label className="block space-y-1.5 text-sm">Código de acesso<input autoComplete="off" required value={code} onChange={(event) => setCode(event.target.value.toUpperCase())} className={`${inputClass} uppercase`} /></label>}
-      <label className="block space-y-1.5 text-sm">Username<input autoComplete="username" required minLength={3} maxLength={32} pattern="[a-zA-Z0-9_.-]+" value={username} onChange={(event) => setUsername(event.target.value)} className={inputClass} /></label>
-      <label className="block space-y-1.5 text-sm">Password<input autoComplete={mode === 'login' ? 'current-password' : 'new-password'} required minLength={mode === 'login' ? undefined : 8} type="password" value={password} onChange={(event) => setPassword(event.target.value)} className={inputClass} /></label>
-      <button disabled={busy} className={`${primaryClass} w-full`} type="submit">{busy ? 'A verificar...' : mode === 'login' ? 'Entrar' : 'Criar conta e entrar'}</button>
+      {notice && <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">{notice}</p>}
+      {error && <p role="alert" className="rounded-lg border border-violet-700 bg-violet-950 p-3 text-sm text-violet-200">{error}</p>}
+      <label className="block space-y-1.5 text-sm">{mode === 'signup' ? 'Email' : 'Email ou nome de utilizador'}<input autoComplete={mode === 'login' ? 'username' : 'email'} required type={mode === 'signup' ? 'email' : 'text'} value={email} onChange={(event) => setEmail(event.target.value)} className={inputClass} placeholder={mode === 'signup' ? 'tu@gmail.com' : 'Email ou nome de utilizador'} /></label>
+      {mode === 'signup' && <label className="block space-y-1.5 text-sm">Nome de utilizador único<input autoComplete="username" required minLength={3} maxLength={32} pattern="[a-zA-Z0-9_.-]+" value={username} onChange={(event) => setUsername(event.target.value)} className={inputClass} placeholder="ex.: maria.silva" /></label>}
+      <label className="block space-y-1.5 text-sm">Palavra-passe<input autoComplete={mode === 'login' ? 'current-password' : 'new-password'} required minLength={mode === 'login' ? undefined : 8} type="password" value={password} onChange={(event) => setPassword(event.target.value)} className={inputClass} /></label>
+      <button disabled={busy} className={`${primaryClass} w-full`} type="submit">{busy ? 'A verificar...' : mode === 'login' ? 'Entrar' : 'Criar conta'}</button>
     </form>
   </main>;
 }
-
 export function RoleDashboard({ user, onLogout }: { user: AppUser; onLogout: () => void }) {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [videos, setVideos] = useState<Video[]>([]);
-  const [managedUsers, setManagedUsers] = useState<ManagedUser[]>([]);
   const [companyName, setCompanyName] = useState('');
   const [videoTitle, setVideoTitle] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
   const [videoCompany, setVideoCompany] = useState('');
-  const [newUsername, setNewUsername] = useState('');
-  const [newRole, setNewRole] = useState<'partner' | 'student'>('partner');
-  const [studentCompany, setStudentCompany] = useState('');
-  const [temporaryPassword, setTemporaryPassword] = useState('');
-  const [accessCodes, setAccessCodes] = useState<AccessCode[]>([]);
-  const [codeCompany, setCodeCompany] = useState('');
-  const [codeRole, setCodeRole] = useState<'partner' | 'student' | 'admin'>('student');
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [isShort, setIsShort] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [workspace, setWorkspace] = useState<'journey' | 'manage'>('journey');
+  const [workspace, setWorkspace] = useState<'journey' | 'manage' | 'shorts'>('journey');
 
   const loadData = useCallback(async () => {
     if (!supabase) return;
-    const [companyResult, videoResult, userResult] = await Promise.all([
-      supabase.from('companies').select('id,name,owner_id,owner_role,status,created_at').order('created_at', { ascending: false }),
-      supabase.from('videos').select('id,title,url,company_id').order('created_at', { ascending: false }),
-      supabase.from('users').select('id,username,role,status').order('created_at', { ascending: false }),
+    const [companyResult, videoResult] = await Promise.all([
+      supabase.from('companies').select('id,name,owner_id,status,created_at').order('created_at', { ascending: false }),
+      supabase.from('videos').select('id,title,url,company_id,is_short').order('created_at', { ascending: false }),
     ]);
-    const firstError = companyResult.error || videoResult.error || userResult.error;
+    const firstError = companyResult.error || videoResult.error;
     if (firstError) setError(firstError.message);
     setCompanies((companyResult.data || []) as Company[]);
     setVideos((videoResult.data || []) as Video[]);
-    setManagedUsers((userResult.data || []) as ManagedUser[]);
   }, []);
 
   useEffect(() => { void Promise.resolve().then(loadData); }, [loadData]);
-  useEffect(() => {
-    if (!temporaryPassword) return;
-    const timeout = window.setTimeout(() => setTemporaryPassword(''), 60_000);
-    return () => window.clearTimeout(timeout);
-  }, [temporaryPassword]);
   const run = async (operation: () => Promise<void>) => {
-    setBusy(true); setError(''); setNotice(''); setTemporaryPassword('');
+    setBusy(true); setError(''); setNotice('');
     try { await operation(); await loadData(); }
     catch (caught) { setError(caught instanceof Error ? caught.message : 'A operação falhou.'); }
     finally { setBusy(false); }
   };
 
-  const loadCodes = useCallback(async () => {
-    if (!supabase || user.role === 'student') return;
-    try {
-      const result = await invokeAccountAction<{ codes: AccessCode[] }>({ action: 'list-codes' });
-      setAccessCodes(result.codes || []);
-    } catch {
-      // Listing codes is best-effort: a failure here must not break the dashboard.
-    }
-  }, [user.role]);
-
-  useEffect(() => { void Promise.resolve().then(loadCodes); }, [loadCodes]);
-
-  const createCode = (event: FormEvent) => {
-    event.preventDefault();
-    void run(async () => {
-      const result = await invokeAccountAction<{ code: string; reused: boolean }>({
-        action: 'create-code', role: codeRole,
-        company_id: codeRole === 'student' ? codeCompany : undefined,
-      });
-      await loadCodes();
-      setNotice(result.reused
-        ? `Código existente reutilizado: ${result.code}`
-        : `Código criado: ${result.code} — entrega à pessoa. Ela escolhe username e senha.`);
-    });
-  };
-
-  const revokeCode = (code: string) => void run(async () => {
-    await invokeAccountAction({ action: 'revoke-code', code });
-    await loadCodes();
-    setNotice(`Código ${code} revogado. Já não cria contas.`);
-  });
-
   const createCompany = (event: FormEvent) => {
     event.preventDefault();
     void run(async () => {
       if (!supabase) throw new Error('Supabase não está configurado.');
-      const { error: insertError } = await supabase.from('companies').insert({ name: companyName, owner_id: user.id, owner_role: user.role });
+      const { error: insertError } = await supabase.from('companies').insert({ name: companyName, owner_id: user.id, owner_role: 'student' });
       if (insertError) throw insertError;
-      setCompanyName(''); setNotice(user.role === 'partner' ? 'Pedido de empresa enviado para aprovação.' : 'Empresa criada e aprovada.');
-    });
-  };
-
-  const createAccount = (event: FormEvent, role: 'partner' | 'student' = newRole) => {
-    event.preventDefault();
-    void run(async () => {
-      const result = await invokeAccountAction<{ password: string }>({ action: 'create-account', username: newUsername, role, company_id: role === 'student' ? studentCompany : undefined });
-      setTemporaryPassword(result.password); setNewUsername(''); setNotice('Conta criada. Copie a senha temporária agora; não será mostrada novamente.');
+      setCompanyName(''); setNotice('Empresa adicionada.');
     });
   };
 
   const createVideo = (event: FormEvent) => {
     event.preventDefault();
     void run(async () => {
-      if (!supabase) throw new Error('Supabase não está configurado.');
-      const { error: insertError } = await supabase.from('videos').insert({ title: videoTitle, url: videoUrl, published_by: user.id, company_id: videoCompany || null });
-      if (insertError) throw insertError;
-      setVideoTitle(''); setVideoUrl(''); setVideoCompany(''); setNotice('Vídeo publicado.');
+      if (!supabase) throw new Error('Supabase nÃ£o estÃ¡ configurado.');
+      let publishedUrl = videoUrl.trim();
+      let uploadedPath: string | null = null;
+      if (videoFile) {
+        if (!['video/mp4', 'video/webm', 'video/quicktime', 'video/ogg'].includes(videoFile.type)) throw new Error('Formato não suportado. Usa MP4, WebM, MOV ou OGG.');
+        if (videoFile.size > 100 * 1024 * 1024) throw new Error('O vídeo tem de ter menos de 100 MB.');
+        const safeName = videoFile.name.replace(/[^a-zA-Z0-9._-]/g, '-');
+        const path = `${user.id}/${crypto.randomUUID()}-${safeName}`;
+        const { error: uploadError } = await supabase.storage.from('public-videos').upload(path, videoFile, { contentType: videoFile.type, upsert: false });
+        if (uploadError) throw uploadError;
+        uploadedPath = path;
+        publishedUrl = supabase.storage.from('public-videos').getPublicUrl(path).data.publicUrl;
+      }
+      if (!publishedUrl) throw new Error('Escolhe um vídeo do dispositivo ou cola um link.');
+      const { error: insertError } = await supabase.from('videos').insert({ title: videoTitle, url: publishedUrl, published_by: user.id, company_id: videoCompany || null, is_short: isShort });
+      if (insertError) {
+        if (uploadedPath) await supabase.storage.from('public-videos').remove([uploadedPath]);
+        throw insertError;
+      }
+      setVideoTitle(''); setVideoUrl(''); setVideoCompany(''); setVideoFile(null); setIsShort(false); setNotice('Vídeo publicado.');
     });
   };
 
-  const reviewCompany = (companyId: string, status: 'approved' | 'rejected') => void run(async () => {
-    if (!supabase) throw new Error('Supabase não está configurado.');
-    const { error: updateError } = await supabase.from('companies').update({ status }).eq('id', companyId);
-    if (updateError) throw updateError;
-  });
+  const changePassword = (event: FormEvent) => {
+    event.preventDefault();
+    void run(async () => {
+      if (!supabase) throw new Error('Supabase não está configurado.');
+      if (user.email) {
+        const { error: verificationError } = await supabase.auth.signInWithPassword({ email: user.email, password: currentPassword });
+        if (verificationError) throw new Error('A palavra-passe atual está incorreta.');
+        const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+        if (updateError) throw updateError;
+      } else {
+        await invokeAccountAction({ action: 'change-password', current_password: currentPassword, new_password: newPassword });
+      }
+      setCurrentPassword(''); setNewPassword(''); setNotice('A tua palavra-passe foi atualizada.');
+    });
+  };
 
-  const resetPassword = (targetId: string) => void run(async () => {
-    const result = await invokeAccountAction<{ password: string }>({ action: 'reset-password', user_id: targetId });
-    setTemporaryPassword(result.password); setNotice('Nova senha temporária criada. Copie agora; não será mostrada novamente.');
-  });
-
-  const canCreateStudent = user.role === 'partner' || user.role === 'admin';
-  const ownedApprovedCompanies = companies.filter((company) => company.owner_id === user.id && company.status === 'approved');
-  const roleLabel = user.role === 'admin' ? 'Admin' : user.role === 'partner' ? 'Partner' : 'Student';
-
-  return <div className="min-h-screen bg-[#09090d] text-white">
-    <header className="border-b border-zinc-800 bg-black/60 px-5 py-4">
+  return <div className="app-shell min-h-screen bg-[#f7f5ff] text-slate-900">
+    <header className="app-header border-b border-violet-100 bg-white px-5 py-4 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div><p className="font-mono text-xs uppercase text-red-400">{workspace === 'journey' ? 'Universidade Pessoal Cibernética' : `Painel ${roleLabel}`}</p><h1 className="text-xl font-semibold">{user.username}</h1></div>
+        <div><p className="font-mono text-xs uppercase text-violet-700">Universidade Pessoal Cibernética</p><h1 className="text-xl font-semibold">{user.username}</h1></div>
         <div className="flex gap-2">{workspace === 'manage' && <button className={buttonClass} onClick={() => void loadData()} title="Atualizar"><RefreshCw size={16} /></button>}<button className={buttonClass} onClick={onLogout}><LogOut size={16} /> Terminar sessão</button></div>
       </div>
-      <nav className="mt-4 flex flex-wrap gap-2">
-        <button onClick={() => setWorkspace('journey')} className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition ${workspace === 'journey' ? 'bg-red-700 text-white' : 'border border-zinc-800 text-zinc-400 hover:text-white'}`}><Sparkles size={15} /> Minha Jornada</button>
-        <button onClick={() => setWorkspace('manage')} className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition ${workspace === 'manage' ? 'bg-red-700 text-white' : 'border border-zinc-800 text-zinc-400 hover:text-white'}`}><Layers size={15} /> {user.role === 'student' ? 'Vídeos da Empresa' : 'Painel de Gestão'}</button>
+      <nav className="app-nav mt-4 flex flex-wrap gap-2" aria-label="Navegação principal">
+        <button onClick={() => setWorkspace('journey')} className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition ${workspace === 'journey' ? 'bg-violet-700 text-white' : 'border border-violet-100 text-slate-500 hover:text-violet-800'}`}><Sparkles size={15} /> Minha Jornada</button>
+        <button onClick={() => setWorkspace('manage')} className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition ${workspace === 'manage' ? 'bg-violet-700 text-white' : 'border border-violet-100 text-slate-500 hover:text-violet-800'}`}><Layers size={15} /> Empresas e grupos</button>
+        <button onClick={() => setWorkspace('shorts')} className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition ${workspace === 'shorts' ? 'bg-violet-700 text-white' : 'border border-violet-100 text-slate-500 hover:text-violet-800'}`}><Clapperboard size={15} /> Shorts</button>
       </nav>
     </header>
-    <main className="mx-auto max-w-6xl space-y-8 px-5 py-8">
+    <main className={`app-main mx-auto max-w-6xl space-y-8 px-5 py-8 ${workspace === 'shorts' ? 'shorts-main' : ''}`}>
       {workspace === 'journey' && <LearnerJourney user={user} />}
+      {workspace === 'shorts' && <section className="shorts-feed" aria-label="Feed de vídeos curtos">{videos.filter((video) => video.is_short).map((video) => <article key={video.id} className="shorts-reel"><video src={video.url} controls playsInline preload="metadata" className="shorts-video" /><div className="shorts-caption"><span className="shorts-tag">SHORT · DESENVOLVIMENTO PESSOAL</span><h2>{video.title}</h2></div></article>)}{videos.every((video) => !video.is_short) && <div className="shorts-empty"><p className="shorts-tag">SHORTS</p><h2>A tua próxima ideia pode começar aqui.</h2><p>A comunidade ainda não publicou vídeos curtos. Quando alguém publicar, aparecem neste feed.</p><button onClick={() => setWorkspace('manage')}>Publicar o primeiro vídeo</button></div>}</section>}
       {workspace === 'manage' && <>
-      {error && <p role="alert" className="rounded-lg border border-red-700 bg-red-950 p-3 text-sm text-red-200">{error}</p>}
+      {error && <p role="alert" className="rounded-lg border border-violet-700 bg-violet-950 p-3 text-sm text-violet-200">{error}</p>}
       {notice && <p role="status" className="rounded-lg border border-emerald-800 bg-emerald-950/50 p-3 text-sm text-emerald-200">{notice}</p>}
-      {temporaryPassword && <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-700 bg-amber-950/50 p-4"><p><span className="block text-xs uppercase text-amber-300">Senha temporária, visível apenas agora</span><code className="text-lg font-bold tracking-widest">{temporaryPassword}</code></p><span className="flex gap-2"><button className={buttonClass} onClick={() => void navigator.clipboard.writeText(temporaryPassword)}><Copy size={15} /> Copiar</button><button className={buttonClass} onClick={() => setTemporaryPassword('')} aria-label="Ocultar senha temporária"><X size={15} /></button></span></div>}
 
-      <form onSubmit={(event) => { event.preventDefault(); void run(async () => { await invokeAccountAction({ action: 'change-password', current_password: currentPassword, new_password: newPassword }); setCurrentPassword(''); setNewPassword(''); setNotice('A tua senha pessoal foi atualizada.'); }); }} className="max-w-xl space-y-3 border-b border-zinc-800 pb-6">
-        <h2 className="text-lg font-semibold">Alterar a minha senha pessoal</h2>
-        <input required type="password" autoComplete="current-password" className={inputClass} placeholder="Senha atual" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
-        <input required minLength={8} type="password" autoComplete="new-password" className={inputClass} placeholder="Nova senha (m?nimo 8 caracteres)" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />
-        <button className={primaryClass} disabled={busy}><Check size={16} /> Guardar senha</button>
+      <form onSubmit={changePassword} className="max-w-xl space-y-3 border-b border-zinc-800 pb-6">
+        <h2 className="text-lg font-semibold">Alterar a minha palavra-passe</h2>
+        <input required type="password" autoComplete="current-password" className={inputClass} placeholder="Palavra-passe atual" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />
+        <input required minLength={8} type="password" autoComplete="new-password" className={inputClass} placeholder="Nova palavra-passe (mínimo 8 caracteres)" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />
+        <button className={primaryClass} disabled={busy}><Check size={16} /> Guardar palavra-passe</button>
       </form>
 
-      {user.role !== 'student' && <section className="grid gap-8 lg:grid-cols-2">
-        <form onSubmit={createCompany} className="space-y-3 border-b border-zinc-800 pb-6"><h2 className="text-lg font-semibold">{user.role === 'admin' ? 'Criar empresa' : 'Pedir aprovação de empresa'}</h2><div className="flex gap-2"><input required minLength={2} maxLength={120} className={inputClass} placeholder="Nome da empresa" value={companyName} onChange={(event) => setCompanyName(event.target.value)} /><button className={primaryClass} disabled={busy}><Plus size={16} /> Criar</button></div></form>
-        <section><h2 className="mb-3 text-lg font-semibold">Empresas</h2><div className="space-y-2">{companies.map((company) => <div key={company.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 py-2"><span>{company.name} <span className="ml-2 text-xs uppercase text-zinc-400">{company.status}</span></span>{user.role === 'admin' && company.owner_role === 'partner' && company.status === 'pending' && <span className="flex gap-2"><button className={buttonClass} onClick={() => reviewCompany(company.id, 'approved')}><Check size={15} /> Aprovar</button><button className={buttonClass} onClick={() => reviewCompany(company.id, 'rejected')}><X size={15} /> Rejeitar</button></span>}</div>)}{companies.length === 0 && <p className="text-sm text-zinc-500">Sem empresas acessíveis.</p>}</div></section>
-      </section>}
+      <section className="grid gap-8 lg:grid-cols-2">
+        <form onSubmit={createCompany} className="space-y-3 border-b border-violet-100 pb-6"><h2 className="text-lg font-semibold">Adicionar empresa</h2><div className="flex gap-2"><input required minLength={2} maxLength={120} className={inputClass} placeholder="Nome da empresa" value={companyName} onChange={(event) => setCompanyName(event.target.value)} /><button className={primaryClass} disabled={busy}><Plus size={16} /> Criar</button></div></form>
+        <section><h2 className="mb-3 text-lg font-semibold">Empresas</h2><div className="space-y-2">{companies.map((company) => <div key={company.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 py-2"><span>{company.name} <span className="ml-2 text-xs uppercase text-zinc-400">{company.status}</span></span></div>)}{companies.length === 0 && <p className="text-sm text-zinc-500">Sem empresas acessíveis.</p>}</div></section>
+      </section>
 
-      {user.role === 'admin' && <section className="grid gap-8 border-b border-zinc-800 pb-8 lg:grid-cols-2">
-        <form onSubmit={createVideo} className="space-y-3"><h2 className="text-lg font-semibold">Publicar vídeo</h2><input required className={inputClass} placeholder="Título" value={videoTitle} onChange={(event) => setVideoTitle(event.target.value)} /><input required type="url" className={inputClass} placeholder="https://..." value={videoUrl} onChange={(event) => setVideoUrl(event.target.value)} /><select className={inputClass} value={videoCompany} onChange={(event) => setVideoCompany(event.target.value)}><option value="">Conteúdo geral</option>{ownedApprovedCompanies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}</select><button className={primaryClass} disabled={busy}><Plus size={16} /> Publicar</button></form>
-        <form onSubmit={createAccount} className="space-y-3"><h2 className="text-lg font-semibold">Criar conta</h2><select className={inputClass} value={newRole} onChange={(event) => setNewRole(event.target.value as 'partner' | 'student')}><option value="partner">Partner</option><option value="student">Student</option></select><input required minLength={3} maxLength={32} pattern="[a-zA-Z0-9_.-]+" className={inputClass} placeholder="Username" value={newUsername} onChange={(event) => setNewUsername(event.target.value)} />{newRole === 'student' && <select required className={inputClass} value={studentCompany} onChange={(event) => setStudentCompany(event.target.value)}><option value="">Escolher empresa aprovada</option>{ownedApprovedCompanies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}</select>}<button className={primaryClass} disabled={busy}><Plus size={16} /> Criar conta</button></form>
-      </section>}
+      <section className="grid gap-8 border-b border-zinc-800 pb-8 lg:grid-cols-2">
+        <form onSubmit={createVideo} className="space-y-3"><h2 className="text-lg font-semibold">Publicar vídeo</h2><input required className={inputClass} placeholder="Título" value={videoTitle} onChange={(event) => setVideoTitle(event.target.value)} /><label className="block space-y-1 text-sm text-slate-600">Carregar vídeo (máx. 100 MB)<input type="file" accept="video/mp4,video/webm,video/quicktime,video/ogg" key={videoFile?.name ?? "empty"} className={`${inputClass} file:mr-3 file:rounded-lg file:border-0 file:bg-violet-100 file:px-3 file:py-2 file:font-semibold file:text-violet-800`} onChange={(event) => setVideoFile(event.target.files?.[0] ?? null)} /></label><input type="url" className={inputClass} placeholder="Ou colar um link de vídeo" value={videoUrl} onChange={(event) => setVideoUrl(event.target.value)} /><select className={inputClass} value={videoCompany} onChange={(event) => setVideoCompany(event.target.value)}><option value="">Conteúdo geral</option>{companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}</select><label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={isShort} onChange={(event) => setIsShort(event.target.checked)} className="size-4 accent-violet-700" />Publicar também na aba Shorts</label><button className={primaryClass} disabled={busy}><Plus size={16} /> Publicar</button></form>
+        <GroupsPanel user={user} />
+      </section>
 
-      {user.role !== 'student' && <section className="max-w-2xl space-y-4 border-b border-zinc-800 pb-8">
-        <div><h2 className="text-lg font-semibold">Códigos de acesso</h2><p className="text-sm text-zinc-400">Gera um código e entrega-o à pessoa. Ela entra em "Criar conta", escolhe o próprio username e senha, e fica criada com o papel e a empresa que definiste aqui. O código não se gasta: podes reutilizá-lo.</p></div>
-        <form onSubmit={createCode} className="space-y-3">
-          <select className={inputClass} value={codeRole} onChange={(event) => setCodeRole(event.target.value as 'partner' | 'student')}>
-            <option value="student">Estudante</option>
-            {user.role === 'admin' && <option value="partner">Partner</option>}
-            {user.role === 'admin' && <option value="admin">Administrador</option>}
-          </select>
-          {codeRole === 'admin' && <p className="rounded-lg border border-amber-700 bg-amber-950 p-3 text-xs text-amber-200">O codigo de administrador e partilhado. Cada pessoa cria a conta com o seu proprio username e senha.</p>}
-          {codeRole === 'student' && <select required className={inputClass} value={codeCompany} onChange={(event) => setCodeCompany(event.target.value)}>
-            <option value="">Escolher empresa aprovada</option>
-            {ownedApprovedCompanies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}
-          </select>}
-          <button className={primaryClass} disabled={busy || (codeRole === 'student' && (!codeCompany || !ownedApprovedCompanies.length))}><Plus size={16} /> Gerar código</button>
-        </form>
-        {accessCodes.length > 0 && <div className="space-y-2">{accessCodes.map((entry) => <div key={entry.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 py-2">
-          <span className="font-mono text-sm">
-            {entry.code}
-            <span className="ml-3 text-xs uppercase text-zinc-500">{entry.role} · {entry.use_count} {entry.use_count === 1 ? 'registo' : 'registos'}{entry.revoked_at ? ' · revogado' : ''}</span>
-          </span>
-          <span className="flex gap-2">
-            <button className={buttonClass} onClick={() => void navigator.clipboard?.writeText(entry.code)}><Copy size={15} /> Copiar</button>
-            {!entry.revoked_at && <button className={buttonClass} onClick={() => revokeCode(entry.code)}><X size={15} /> Revogar</button>}
-          </span>
-        </div>)}</div>}
-      </section>}
-
-      {user.role === 'partner' && <section className="max-w-xl space-y-3 border-b border-zinc-800 pb-8"><h2 className="text-lg font-semibold">Adicionar estudante</h2><p className="text-sm text-zinc-400">Só é possível depois da aprovação da empresa.</p><form onSubmit={(event) => createAccount(event, 'student')} className="space-y-3"><input required minLength={3} maxLength={32} pattern="[a-zA-Z0-9_.-]+" className={inputClass} placeholder="Username" value={newUsername} onChange={(event) => setNewUsername(event.target.value)} /><select required className={inputClass} value={studentCompany} onChange={(event) => setStudentCompany(event.target.value)}><option value="">Empresa aprovada</option>{ownedApprovedCompanies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}</select><button className={primaryClass} disabled={busy || !canCreateStudent || !ownedApprovedCompanies.length}><Plus size={16} /> Criar estudante</button></form></section>}
-
-      {user.role !== 'student' && <section className="space-y-3 border-b border-zinc-800 pb-8"><h2 className="text-lg font-semibold">Contas geridas</h2>{managedUsers.filter((account) => account.id !== user.id).map((account) => <div key={account.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 py-2"><span>{account.username} <span className="ml-2 text-xs uppercase text-zinc-500">{account.role} · {account.status}</span></span><button className={buttonClass} onClick={() => resetPassword(account.id)}><RefreshCw size={15} /> Gerar nova senha</button></div>)}</section>}
-
-
-      <section><h2 className="mb-3 text-lg font-semibold">{user.role === 'student' ? 'Conteúdo da empresa' : 'Vídeos disponíveis'}</h2><div className="grid gap-3 md:grid-cols-2">{videos.map((video) => <article key={video.id} className="rounded-lg border border-zinc-800 p-4"><h3 className="font-semibold">{video.title}</h3><a className="mt-2 inline-block text-sm text-red-300 underline" href={video.url} target="_blank" rel="noreferrer">Abrir vídeo</a></article>)}{videos.length === 0 && <p className="text-sm text-zinc-500">Ainda não há vídeos disponíveis.</p>}</div></section>
+      <section><h2 className="mb-3 text-lg font-semibold">Vídeos disponíveis</h2><div className="grid gap-3 md:grid-cols-2">{videos.filter((video) => !video.is_short).map((video) => <article key={video.id} className="rounded-lg border border-zinc-800 p-4"><h3 className="font-semibold">{video.title}</h3><a className="mt-2 inline-block text-sm text-violet-700 underline" href={video.url} target="_blank" rel="noreferrer">Abrir vídeo</a></article>)}{videos.filter((video) => !video.is_short).length === 0 && <p className="text-sm text-zinc-500">Ainda não há vídeos disponíveis.</p>}</div></section>
       </>}
     </main>
   </div>;

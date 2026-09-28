@@ -27,13 +27,13 @@ export const CurriculumPhaseView: React.FC<CurriculumPhaseViewProps> = ({
   return (
     <div className="space-y-8">
       {/* V8 Master Prompt Rule Banner */}
-      <div className="p-4 rounded-xl bg-red-950/30 border border-red-900/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="p-4 rounded-xl bg-violet-950/30 border border-violet-900/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-red-950 border border-red-600 text-red-400">
-            <Sparkles className="w-5 h-5 text-red-400" />
+          <div className="p-2 rounded-lg bg-violet-950 border border-violet-600 text-violet-400">
+            <Sparkles className="w-5 h-5 text-violet-400" />
           </div>
           <div>
-            <div className="text-xs font-mono uppercase tracking-wider text-red-400">
+            <div className="text-xs font-mono uppercase tracking-wider text-violet-400">
               Protocolo V8 — Entrega Restrita por Fases
             </div>
             <div className="text-sm font-semibold text-white">
@@ -48,9 +48,9 @@ export const CurriculumPhaseView: React.FC<CurriculumPhaseViewProps> = ({
 
       {/* Main Phase Header */}
       <div className="bg-[#0f0f16] border border-zinc-800 rounded-2xl p-6 md:p-8 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-red-600/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-violet-600/10 rounded-full blur-3xl pointer-events-none" />
         <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-          <span className="px-3 py-1 rounded-full text-xs font-mono bg-red-950/80 text-red-400 border border-red-600/50 uppercase tracking-wider">
+          <span className="px-3 py-1 rounded-full text-xs font-mono bg-violet-950/80 text-violet-400 border border-violet-600/50 uppercase tracking-wider">
             {phase.pillar.toUpperCase().replace('_', ' & ')} • FASE EM EXECUÇÃO
           </span>
           <span className="text-xs font-mono text-zinc-400">
@@ -70,22 +70,22 @@ export const CurriculumPhaseView: React.FC<CurriculumPhaseViewProps> = ({
       {/* Prescribed Resources (Adaptive based on content preference) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Main Resource Card */}
-        <div className="bg-[#12121a] border-2 border-red-600/50 rounded-2xl p-6 cyber-glow-red flex flex-col justify-between">
+        <div className="bg-[#12121a] border-2 border-violet-600/50 rounded-2xl p-6 cyber-glow-red flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
-              <span className="px-2.5 py-1 rounded-md text-[11px] font-mono font-bold bg-red-950 text-red-400 border border-red-500 uppercase tracking-wider flex items-center gap-1.5">
+              <span className="px-2.5 py-1 rounded-md text-[11px] font-mono font-bold bg-violet-950 text-violet-400 border border-violet-500 uppercase tracking-wider flex items-center gap-1.5">
                 {phase.mainResource.type === 'livro' ? <BookOpen className="w-3.5 h-3.5" /> : <Film className="w-3.5 h-3.5" />}
                 Prescrição Principal
               </span>
               <span className="text-xs font-mono text-zinc-400">
-                Profundidade: <strong className="text-red-300">{phase.mainResource.readDepth}</strong> · {roleLine(phase.mainResource)}
+                Profundidade: <strong className="text-violet-300">{phase.mainResource.readDepth}</strong> · {roleLine(phase.mainResource)}
               </span>
             </div>
 
             <h3 className="text-xl font-bold font-display text-white mb-1">
               {phase.mainResource.title}
             </h3>
-            <div className="text-sm font-medium text-red-400 mb-4">
+            <div className="text-sm font-medium text-violet-400 mb-4">
               {phase.mainResource.creator} ({phase.mainResource.year}) • {phase.mainResource.durationOrPages}
             </div>
 
@@ -104,8 +104,8 @@ export const CurriculumPhaseView: React.FC<CurriculumPhaseViewProps> = ({
                 {phase.mainResource.bestPracticalApplication}
               </div>
 
-              <div className="p-3 rounded-lg bg-red-950/30 border border-red-900/50 text-red-300">
-                <span className="font-mono text-red-400 block mb-1 uppercase tracking-wider flex items-center gap-1">
+              <div className="p-3 rounded-lg bg-violet-950/30 border border-violet-900/50 text-violet-300">
+                <span className="font-mono text-violet-400 block mb-1 uppercase tracking-wider flex items-center gap-1">
                   <ShieldAlert className="w-3.5 h-3.5" />
                   Alerta Crítico / Distorção:
                 </span>
@@ -117,7 +117,7 @@ export const CurriculumPhaseView: React.FC<CurriculumPhaseViewProps> = ({
           <div className="mt-6 pt-4 border-t border-zinc-800 flex items-center justify-between">
             <button
               onClick={() => onOpenReview('livro')}
-              className="w-full py-2.5 px-4 rounded-xl bg-red-950/70 hover:bg-red-900 border border-red-600/60 text-red-200 text-xs font-mono font-semibold transition-all flex items-center justify-center gap-2"
+              className="w-full py-2.5 px-4 rounded-xl bg-violet-950/70 hover:bg-violet-900 border border-violet-600/60 text-violet-200 text-xs font-mono font-semibold transition-all flex items-center justify-center gap-2"
             >
               Concluir Estudo & Fazer Revisão do Recurso
             </button>
@@ -130,7 +130,7 @@ export const CurriculumPhaseView: React.FC<CurriculumPhaseViewProps> = ({
             <div>
               <div className="flex items-center justify-between mb-4">
                 <span className="px-2.5 py-1 rounded-md text-[11px] font-mono font-semibold bg-zinc-900 text-zinc-300 border border-zinc-700 uppercase tracking-wider flex items-center gap-1.5">
-                  <Film className="w-3.5 h-3.5 text-red-400" />
+                  <Film className="w-3.5 h-3.5 text-violet-400" />
                   Complemento Audiovisual Opcional
                 </span>
                 <span className="text-xs font-mono text-zinc-400">
@@ -176,13 +176,13 @@ export const CurriculumPhaseView: React.FC<CurriculumPhaseViewProps> = ({
       </div>
 
       {/* Real-World Project & Application */}
-      <div className="bg-gradient-to-r from-red-950/30 via-[#101017] to-black border-2 border-red-600/40 rounded-2xl p-6 md:p-8">
+      <div className="bg-gradient-to-r from-violet-950/30 via-[#101017] to-black border-2 border-violet-600/40 rounded-2xl p-6 md:p-8">
         <div className="flex items-center gap-3 mb-4">
-          <div className="p-2.5 rounded-xl bg-red-950 border border-red-500 text-red-400">
+          <div className="p-2.5 rounded-xl bg-violet-950 border border-violet-500 text-violet-400">
             <Target className="w-5 h-5" />
           </div>
           <div>
-            <div className="text-xs font-mono uppercase text-red-400">
+            <div className="text-xs font-mono uppercase text-violet-400">
             Exigência Não Negociável — applicationProject
             </div>
             <h3 className="text-xl font-bold font-display text-white">
@@ -200,7 +200,7 @@ export const CurriculumPhaseView: React.FC<CurriculumPhaseViewProps> = ({
             <span className="text-[11px] font-mono text-zinc-500 uppercase tracking-wider block">
               Entregável Concreto & Verificável:
             </span>
-            <span className="text-xs font-semibold text-red-300">
+            <span className="text-xs font-semibold text-violet-300">
               {phase.applicationProject.measurementCriteria}
             </span>
           </div>
@@ -215,7 +215,7 @@ export const CurriculumPhaseView: React.FC<CurriculumPhaseViewProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <h3 className="text-xl font-bold font-display text-white flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-red-500" />
+              <Calendar className="w-5 h-5 text-violet-500" />
               Plano de Execução Semanal
             </h3>
             <p className="text-xs text-zinc-400">
@@ -230,7 +230,7 @@ export const CurriculumPhaseView: React.FC<CurriculumPhaseViewProps> = ({
                 onClick={() => onProgressChange({ ...progress, activeWeek: wp.week })}
                 className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all ${
                   activeWeek === wp.week
-                    ? 'bg-red-600 text-white shadow-md shadow-red-900'
+                    ? 'bg-violet-600 text-white shadow-md shadow-violet-900'
                     : 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800'
                 }`}
               >
@@ -245,8 +245,8 @@ export const CurriculumPhaseView: React.FC<CurriculumPhaseViewProps> = ({
           .filter((wp) => wp.week === activeWeek)
           .map((wp) => (
             <div key={wp.week} className="space-y-4">
-              <div className="p-4 rounded-xl bg-red-950/20 border border-red-900/40">
-                <span className="text-[11px] font-mono text-red-400 uppercase tracking-wider block">
+              <div className="p-4 rounded-xl bg-violet-950/20 border border-violet-900/40">
+                <span className="text-[11px] font-mono text-violet-400 uppercase tracking-wider block">
                   Foco da Semana {wp.week}:
                 </span>
                 <span className="text-base font-semibold text-white">{wp.focus}</span>
@@ -287,13 +287,13 @@ export const CurriculumPhaseView: React.FC<CurriculumPhaseViewProps> = ({
 
               <div className="p-3.5 rounded-xl bg-black/60 border border-zinc-800 flex items-center justify-between text-xs font-mono">
                 <span className="text-zinc-400">Métrica Mensurável da Semana:</span>
-                <span className="text-red-400 font-semibold">{wp.measurableMetric}</span>
+                <span className="text-violet-400 font-semibold">{wp.measurableMetric}</span>
               </div>
 
               <div className="pt-2 flex justify-end">
                 <button
                   onClick={() => onOpenReview('semanal')}
-                  className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 hover:border-red-600 text-white text-xs font-mono transition-all flex items-center gap-2"
+                  className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 hover:border-violet-600 text-white text-xs font-mono transition-all flex items-center gap-2"
                 >
                   Submeter Revisão da Semana {wp.week} →
                 </button>

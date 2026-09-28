@@ -31,9 +31,9 @@ const STATUS: Record<AuditStatus, { label: string; box: string; icon: string; ch
   },
   falha: {
     label: 'Falha',
-    box: 'border-red-400/30 bg-red-400/[0.06]',
-    icon: 'text-red-300',
-    chip: 'bg-red-400/15 text-red-200',
+    box: 'border-violet-400/30 bg-violet-400/[0.06]',
+    icon: 'text-violet-300',
+    chip: 'bg-violet-400/15 text-violet-200',
     Icon: XCircle,
   },
 };
@@ -87,7 +87,7 @@ export default function V8AuditView() {
       </div>
 
       {failures > 0 && (
-        <p role="alert" className="rounded-2xl border border-red-400/40 bg-red-400/10 p-3 text-xs text-red-200">
+        <p role="alert" className="rounded-2xl border border-violet-400/40 bg-violet-400/10 p-3 text-xs text-violet-200">
           Existem {failures} falha(s) de conformidade. O relatório não deve ser tratado como certificado enquanto
           não forem corrigidas e o check voltar a passar.
         </p>

@@ -60,6 +60,27 @@ supabase functions deploy mentor-chat
 supabase functions deploy public-profile
 ```
 
+Depois de publicar as alterações à aplicação, aplica também a migração
+`202609270009_unified_access_and_groups.sql` e volta a publicar
+`auth-accounts`. A migração mantém os cargos antigos apenas nos registos para
+compatibilidade, deixa de os usar para separar o acesso, cria as tabelas de
+grupos e reforça a unicidade dos nomes. O registo passa a usar email e
+palavra-passe individuais; os códigos de acesso antigos deixam de aceitar
+registos. Empresas pendentes
+passam a aprovadas porque já não existe aprovação por cargo.
+
+Os novos grupos permitem adicionar nomes de utilizador existentes e empresas.
+Todos os membros autenticados podem criar grupos e empresas, publicar vídeos e
+usar as mesmas áreas da plataforma. Uploads de vídeo até 100 MB ficam no bucket
+público `public-videos`; marca uma publicação como curta para a incluir em
+Shorts e no perfil público. As senhas continuam privadas e individuais.
+
+O registo por email cria a conta no Supabase Auth e o trigger da migraÃ§Ã£o
+`202609280001_email_registration.sql` cria o perfil com nome de utilizador
+Ãºnico. Confirma que Email signups estÃ¡ ativo nas definiÃ§Ãµes de autenticaÃ§Ã£o do
+projeto Supabase e que o URL do GitHub Pages estÃ¡ autorizado como URL de
+redirecionamento para confirmaÃ§Ã£o de email.
+
 Configura a chave OpenRouter apenas como secret do servidor Supabase:
 
 ```powershell

@@ -6,11 +6,10 @@ const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 export const supabaseConfigured = Boolean(url && anonKey);
 export const supabase = supabaseConfigured ? createClient(url, anonKey) : null;
 
-export type AppRole = 'admin' | 'partner' | 'student';
 export interface AppUser {
   id: string;
   username: string;
-  role: AppRole;
+  email?: string;
   status: 'active' | 'pending' | 'rejected';
   created_by: string | null;
 }

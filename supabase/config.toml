@@ -13,7 +13,7 @@ verify_jwt = false
 verify_jwt = false
 
 [auth.email]
-enable_signup = false
+enable_signup = true
 
 [auth.external.google]
 enabled = false

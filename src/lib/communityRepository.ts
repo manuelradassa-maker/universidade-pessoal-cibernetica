@@ -8,6 +8,13 @@ export interface PublicCreatorProfile {
   bio: string;
   avatarUrl: string | null;
 }
+export interface PublicCreatorVideo {
+  id: string;
+  title: string;
+  url: string;
+  isShort: boolean;
+  createdAt: string;
+}
 
 type ProfileRow = { user_id: string; username: string; display_name: string; bio: string; avatar_url: string | null };
 type PostRow = { id: string; author_id: string; pillar: VitruvianPillar; title: string; content: string; evidence_type: CommunityPost['evidenceType']; evidence_proof: string; created_at: string };
@@ -75,6 +82,17 @@ export async function getPublicPosts(authorId?: string): Promise<CommunityPost[]
       timestamp: post.created_at, createdAt: post.created_at,
     };
   });
+}
+
+export async function getPublicCreatorVideos(authorId: string): Promise<PublicCreatorVideo[]> {
+  const { data, error } = await requireSupabase().from('videos')
+    .select('id,title,url,is_short,created_at').eq('published_by', authorId)
+    .order('created_at', { ascending: false }).limit(60);
+  if (error) throw error;
+  return (data ?? []).map((video) => ({
+    id: video.id, title: video.title, url: video.url,
+    isShort: video.is_short, createdAt: video.created_at,
+  }));
 }
 
 export async function savePublicProfile(user: UserProfile, displayName: string, bio: string): Promise<void> {

@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { PillarInfo, VitruvianPillar } from '../types';
 import { Shield, Brain, BookOpen, Flame, Compass, AlertCircle, ArrowUpRight } from 'lucide-react';
 
@@ -16,13 +16,13 @@ export const VitruvianDashboard: React.FC<VitruvianDashboardProps> = ({
   const getPillarIcon = (id: VitruvianPillar) => {
     switch (id) {
       case 'mente':
-        return <Brain className="w-5 h-5 text-red-400" />;
+        return <Brain className="w-5 h-5 text-violet-400" />;
       case 'intelecto':
-        return <BookOpen className="w-5 h-5 text-red-400" />;
+        return <BookOpen className="w-5 h-5 text-violet-400" />;
       case 'corpo_acao':
-        return <Flame className="w-5 h-5 text-red-500 animate-pulse" />;
+        return <Flame className="w-5 h-5 text-violet-500 animate-pulse" />;
       case 'proposito':
-        return <Compass className="w-5 h-5 text-red-400" />;
+        return <Compass className="w-5 h-5 text-violet-400" />;
     }
   };
 
@@ -36,8 +36,8 @@ export const VitruvianDashboard: React.FC<VitruvianDashboardProps> = ({
         );
       case 'gargalo_atual':
         return (
-          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-red-950/90 text-red-300 border border-red-500 animate-pulse flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-violet-950/90 text-violet-300 border border-violet-500 animate-pulse flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-violet-500" />
             Gargalo Principal Ativo
           </span>
         );
@@ -54,11 +54,11 @@ export const VitruvianDashboard: React.FC<VitruvianDashboardProps> = ({
   return (
     <div className="space-y-6">
       {/* Vitruvian Header Banner */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-red-950/40 via-[#0d0d14] to-black border border-red-900/40 p-6 md:p-8 cyber-glass">
-        <div className="absolute top-0 right-0 w-80 h-80 bg-red-600/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-violet-950/40 via-[#0d0d14] to-black border border-violet-900/40 p-6 md:p-8 cyber-glass">
+        <div className="absolute top-0 right-0 w-80 h-80 bg-violet-600/10 rounded-full blur-3xl pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-950/70 border border-red-600/50 text-red-400 text-xs font-mono uppercase tracking-wider">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-violet-950/70 border border-violet-600/50 text-violet-400 text-xs font-mono uppercase tracking-wider">
               <Shield className="w-3.5 h-3.5" />
               Arquitetura Conceitual dos 4 Pilares
             </div>
@@ -71,8 +71,8 @@ export const VitruvianDashboard: React.FC<VitruvianDashboardProps> = ({
           </div>
 
           {/* Active Bottleneck summary badge */}
-          <div className="p-4 rounded-xl bg-black/80 border border-red-600/60 shadow-lg cyber-glow-red flex items-center gap-4">
-            <div className="p-3 rounded-lg bg-red-950 border border-red-600 text-red-400">
+          <div className="p-4 rounded-xl bg-black/80 border border-violet-600/60 shadow-lg cyber-glow-red flex items-center gap-4">
+            <div className="p-3 rounded-lg bg-violet-950 border border-violet-600 text-violet-400">
               <AlertCircle className="w-6 h-6 animate-pulse" />
             </div>
             <div>
@@ -82,7 +82,7 @@ export const VitruvianDashboard: React.FC<VitruvianDashboardProps> = ({
               <div className="text-base font-bold text-white uppercase font-display">
                 {pillars.find((p) => p.id === activeBottleneck)?.title || 'Corpo & Ação'}
               </div>
-              <div className="text-xs text-red-400 font-mono">
+              <div className="text-xs text-violet-400 font-mono">
                 Determina por onde o currículo começa
               </div>
             </div>
@@ -100,8 +100,8 @@ export const VitruvianDashboard: React.FC<VitruvianDashboardProps> = ({
               onClick={() => onSelectPillar && onSelectPillar(pillar.id)}
               className={`relative rounded-2xl p-5 border transition-all duration-300 flex flex-col justify-between cursor-pointer ${
                 isBottleneck
-                  ? 'bg-gradient-to-b from-[#18080a] to-[#0c0c12] border-red-600 cyber-glow-red scale-[1.02]'
-                  : 'bg-[#0e0e14]/90 border-zinc-800 hover:border-red-900/60 hover:bg-[#12121a]'
+                  ? 'bg-gradient-to-b from-[#18080a] to-[#0c0c12] border-violet-600 cyber-glow-red scale-[1.02]'
+                  : 'bg-[#0e0e14]/90 border-zinc-800 hover:border-violet-900/60 hover:bg-[#12121a]'
               }`}
             >
               <div>
@@ -119,7 +119,7 @@ export const VitruvianDashboard: React.FC<VitruvianDashboardProps> = ({
                 <h3 className="text-lg font-bold font-display text-white tracking-wide">
                   {pillar.title}
                 </h3>
-                <div className="text-xs font-mono text-red-400/90 mb-2">
+                <div className="text-xs font-mono text-violet-400/90 mb-2">
                   {pillar.subtitle}
                 </div>
                 <p className="text-xs text-zinc-400 leading-relaxed line-clamp-3 mb-4">
@@ -135,7 +135,7 @@ export const VitruvianDashboard: React.FC<VitruvianDashboardProps> = ({
                   <div className="w-full bg-zinc-900 h-1.5 rounded-full overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all duration-500 ${
-                        isBottleneck ? 'bg-red-500 shadow-sm shadow-red-500' : 'bg-zinc-600'
+                        isBottleneck ? 'bg-violet-500 shadow-sm shadow-violet-500' : 'bg-zinc-600'
                       }`}
                       style={{ width: `${pillar.score}%` }}
                     />
@@ -151,7 +151,7 @@ export const VitruvianDashboard: React.FC<VitruvianDashboardProps> = ({
                     <ul className="space-y-1">
                       {pillar.invisibleModules.slice(0, 3).map((mod, idx) => (
                         <li key={idx} className="text-[11px] text-zinc-300 flex items-center gap-1.5">
-                          <span className="w-1 h-1 rounded-full bg-red-500" />
+                          <span className="w-1 h-1 rounded-full bg-violet-500" />
                           <span className="truncate">{mod}</span>
                         </li>
                       ))}
@@ -161,7 +161,7 @@ export const VitruvianDashboard: React.FC<VitruvianDashboardProps> = ({
               </div>
 
               {/* Card Footer action */}
-              <div className="mt-4 pt-3 border-t border-zinc-800/60 flex items-center justify-between text-xs font-mono text-red-400">
+              <div className="mt-4 pt-3 border-t border-zinc-800/60 flex items-center justify-between text-xs font-mono text-violet-400">
                 <span>Ver detalhes do pilar</span>
                 <ArrowUpRight className="w-3.5 h-3.5" />
               </div>

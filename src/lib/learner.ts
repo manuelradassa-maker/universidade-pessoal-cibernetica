@@ -11,7 +11,7 @@ import {
   INITIAL_PHASE_EXECUTION,
   INITIAL_PILLARS,
 } from '../data/defaultState';
-import type { AppRole, AppUser } from './supabase';
+import type { AppUser } from './supabase';
 
 /**
  * PONTE AppUser <-> UserProfile
@@ -50,12 +50,6 @@ export interface LearnerState {
   mentorMessages: ChatMessage[];
 }
 
-const ROLE_AVATAR: Record<AppRole, string> = {
-  admin: '🛡️',
-  partner: '🏛️',
-  student: '🎓',
-};
-
 export const learnerStorageKey = (userId: string): string => `${STORE_PREFIX}${userId}`;
 
 /** Constrói o perfil base a partir da conta autenticada. Nada é inventado: */
@@ -63,7 +57,7 @@ export const profileFromAppUser = (appUser: AppUser): UserProfile => ({
   id: appUser.id,
   name: appUser.username,
   email: `${appUser.username}@universidade.local`,
-  avatar: ROLE_AVATAR[appUser.role] ?? '🎓',
+  avatar: '🌱',
   avatarType: 'emoji',
   learnerData: { ...INITIAL_LEARNER_DATA },
   evaluated: false,

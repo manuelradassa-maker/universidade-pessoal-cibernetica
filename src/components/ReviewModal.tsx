@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { ReviewEntry, VitruvianPillar } from '../types';
 import { CheckSquare, X, Send } from 'lucide-react';
 
@@ -76,11 +76,11 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
-      <div className="relative w-full max-w-2xl p-6 md:p-8 bg-[#0d0d14] border-2 border-red-600/50 rounded-2xl shadow-2xl cyber-glow-red overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="relative w-full max-w-2xl p-6 md:p-8 bg-[#0d0d14] border-2 border-violet-600/50 rounded-2xl shadow-2xl cyber-glow-red overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-zinc-800 pb-4 mb-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-red-950 border border-red-500/50 text-red-400">
+            <div className="p-2 rounded-lg bg-violet-950 border border-violet-500/50 text-violet-400">
               <CheckSquare className="w-5 h-5" />
             </div>
             <div>
@@ -97,7 +97,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
         </div>
 
         {error && (
-          <div className="mb-4 p-3 rounded-lg bg-red-950/80 border border-red-600 text-red-200 text-xs font-mono">
+          <div className="mb-4 p-3 rounded-lg bg-violet-950/80 border border-violet-600 text-violet-200 text-xs font-mono">
             ⚠️ {error}
           </div>
         )}
@@ -113,7 +113,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
               value={chapters}
               onChange={(e) => setChapters(e.target.value)}
               placeholder="Ex: Capítulos 1 a 4 (páginas 1 a 92) ou Episódio 1 e 2"
-              className="w-full px-3.5 py-2.5 rounded-lg bg-black/60 border border-zinc-700 text-white text-xs outline-none focus:border-red-500"
+              className="w-full px-3.5 py-2.5 rounded-lg bg-black/60 border border-zinc-700 text-white text-xs outline-none focus:border-violet-500"
             />
           </div>
 
@@ -126,7 +126,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
               value={keyIdeas}
               onChange={(e) => setKeyIdeas(e.target.value)}
               placeholder="O que é que realmente mudou a tua perceção? Sintetiza sem olhar para as notas."
-              className="w-full p-3 rounded-lg bg-black/60 border border-zinc-700 text-white text-xs outline-none focus:border-red-500"
+              className="w-full p-3 rounded-lg bg-black/60 border border-zinc-700 text-white text-xs outline-none focus:border-violet-500"
             />
           </div>
 
@@ -140,7 +140,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                 value={appliedAction}
                 onChange={(e) => setAppliedAction(e.target.value)}
                 placeholder="Ex: Instalei o bloco de 90m das 7h às 8h30 sem telefone."
-                className="w-full p-3 rounded-lg bg-black/60 border border-zinc-700 text-white text-xs outline-none focus:border-red-500"
+                className="w-full p-3 rounded-lg bg-black/60 border border-zinc-700 text-white text-xs outline-none focus:border-violet-500"
               />
             </div>
 
@@ -153,7 +153,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                 value={resultObtained}
                 onChange={(e) => setResultObtained(e.target.value)}
                 placeholder="Ex: Concluí o esboço de código e tive 0 interrupções."
-                className="w-full p-3 rounded-lg bg-black/60 border border-zinc-700 text-white text-xs outline-none focus:border-red-500"
+                className="w-full p-3 rounded-lg bg-black/60 border border-zinc-700 text-white text-xs outline-none focus:border-violet-500"
               />
             </div>
           </div>
@@ -168,7 +168,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                 value={difficulties}
                 onChange={(e) => setDifficulties(e.target.value)}
                 placeholder="Ex: Vontade de checar notificações nos primeiros 15 minutos."
-                className="w-full p-3 rounded-lg bg-black/60 border border-zinc-700 text-white text-xs outline-none focus:border-red-500"
+                className="w-full p-3 rounded-lg bg-black/60 border border-zinc-700 text-white text-xs outline-none focus:border-violet-500"
               />
             </div>
 
@@ -181,20 +181,20 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                 value={avoided}
                 onChange={(e) => setAvoided(e.target.value)}
                 placeholder="Descreve uma ação concreta que evitaste ou adiastes."
-                className="w-full p-3 rounded-lg bg-black/60 border border-zinc-700 text-white text-xs outline-none focus:border-red-500"
+                className="w-full p-3 rounded-lg bg-black/60 border border-zinc-700 text-white text-xs outline-none focus:border-violet-500"
               />
             </div>
           </div>
 
           <label className="block text-xs font-mono text-zinc-300">Ajuste necessário para o próximo ciclo:
-            <textarea rows={2} value={adjustments} onChange={(e) => setAdjustments(e.target.value)} className="mt-1 w-full rounded-lg border border-zinc-700 bg-black/60 p-3 text-xs text-white outline-none focus:border-red-500" />
+            <textarea rows={2} value={adjustments} onChange={(e) => setAdjustments(e.target.value)} className="mt-1 w-full rounded-lg border border-zinc-700 bg-black/60 p-3 text-xs text-white outline-none focus:border-violet-500" />
           </label>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block text-xs font-mono text-zinc-300">Tempo gasto (se conhecido)
-              <input value={timeSpent} onChange={(e) => setTimeSpent(e.target.value)} className="mt-1 w-full rounded-lg border border-zinc-700 bg-black/60 px-3 py-2.5 text-xs text-white outline-none focus:border-red-500" placeholder="Ex.: 2 h 30 min" />
+              <input value={timeSpent} onChange={(e) => setTimeSpent(e.target.value)} className="mt-1 w-full rounded-lg border border-zinc-700 bg-black/60 px-3 py-2.5 text-xs text-white outline-none focus:border-violet-500" placeholder="Ex.: 2 h 30 min" />
             </label>
             <label className="flex items-center gap-2 self-end rounded-lg border border-zinc-800 p-3 text-xs text-zinc-300">
-              <input type="checkbox" checked={explain} onChange={(e) => setExplain(e.target.checked)} className="accent-red-600" />
+              <input type="checkbox" checked={explain} onChange={(e) => setExplain(e.target.checked)} className="accent-violet-600" />
               Consigo explicar as ideias sem consultar notas
             </label>
           </div>
@@ -213,7 +213,7 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
             </button>
             <button
               type="submit"
-              className="px-5 py-2 rounded-xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white text-xs font-mono font-semibold shadow-lg shadow-red-950 flex items-center gap-2"
+              className="px-5 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-violet-700 hover:from-violet-500 hover:to-violet-600 text-white text-xs font-mono font-semibold shadow-lg shadow-violet-950 flex items-center gap-2"
             >
               <Send className="w-3.5 h-3.5" />
               Submeter & Atualizar Pilares
