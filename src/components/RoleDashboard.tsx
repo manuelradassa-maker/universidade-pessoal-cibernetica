@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { Upload } from 'tus-js-client';
 import { AppUser, invokeAccountAction, supabase } from '../lib/supabase';
 import { LogOut, Plus, RefreshCw, Check, Layers, Sparkles, Clapperboard } from 'lucide-react';
 import { LearnerJourney } from './LearnerJourney';
@@ -27,10 +28,14 @@ export function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: AppUse
       if (mode === 'signup') {
         const { data, error: signupError } = await supabase.auth.signUp({
           email: email.trim().toLowerCase(), password,
-          options: { data: { username: username.trim().toLowerCase(), registration_method: 'email' } },
+          options: {
+            data: { username: username.trim().toLowerCase(), registration_method: 'email' },
+            emailRedirectTo: new URL(import.meta.env.BASE_URL, window.location.origin).toString(),
+          },
         });
         if (signupError) {
-          if (signupError.message.toLowerCase().includes('username')) throw new Error('Esse nome de utilizador já está em uso. Escolhe outro.');
+          if (signupError.message.toLowerCase().includes('username') || signupError.message.toLowerCase().includes('duplicate key')) throw new Error('Esse nome de utilizador já está em uso. Escolhe outro.');
+          if (signupError.message.toLowerCase().includes('database error')) throw new Error('Não foi possível criar o perfil. Confirma que o nome de utilizador é único e tenta novamente.');
           throw signupError;
         }
         if (!data.session) {
@@ -44,7 +49,12 @@ export function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: AppUse
         onAuthenticated({ ...(profile as AppUser), email: data.user.email ?? undefined });
       } else if (email.includes('@')) {
         const { data, error: loginError } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
-        if (loginError || !data.user) throw new Error('Email ou palavra-passe incorretos.');
+        if (loginError || !data.user) {
+          const message = loginError?.message.toLowerCase() ?? '';
+          if (message.includes('email not confirmed')) throw new Error('Confirma primeiro o email enviado. Se não chegou, verifica o spam ou pede um novo email de confirmação.');
+          if (message.includes('invalid login credentials')) throw new Error('Email ou palavra-passe incorretos.');
+          throw new Error(loginError?.message || 'Não foi possível iniciar sessão. Tenta novamente.');
+        }
         const { data: profile, error: profileError } = await supabase.from('users')
           .select('id, username, status, created_by').eq('id', data.user.id).single();
         if (profileError || !profile || profile.status !== 'active') {
@@ -95,6 +105,7 @@ export function RoleDashboard({ user, onLogout }: { user: AppUser; onLogout: () 
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [workspace, setWorkspace] = useState<'journey' | 'manage' | 'shorts'>('journey');
 
   const loadData = useCallback(async () => {
@@ -138,8 +149,26 @@ export function RoleDashboard({ user, onLogout }: { user: AppUser; onLogout: () 
         if (videoFile.size > 100 * 1024 * 1024) throw new Error('O vídeo tem de ter menos de 100 MB.');
         const safeName = videoFile.name.replace(/[^a-zA-Z0-9._-]/g, '-');
         const path = `${user.id}/${crypto.randomUUID()}-${safeName}`;
-        const { error: uploadError } = await supabase.storage.from('public-videos').upload(path, videoFile, { contentType: videoFile.type, upsert: false });
-        if (uploadError) throw uploadError;
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !session) throw new Error('A sessão expirou. Termina sessão e entra novamente para publicar.');
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+        const projectRef = new URL(supabaseUrl).hostname.split('.')[0];
+        await new Promise<void>((resolve, reject) => {
+          const upload = new Upload(videoFile, {
+            endpoint: `https://${projectRef}.storage.supabase.co/storage/v1/upload/resumable`,
+            retryDelays: [0, 3000, 5000, 10000, 20000],
+            headers: { authorization: `Bearer ${session.access_token}`, apikey: anonKey },
+            metadata: { bucketName: 'public-videos', objectName: path, contentType: videoFile.type, cacheControl: '3600' },
+            chunkSize: 6 * 1024 * 1024,
+            uploadDataDuringCreation: true,
+            removeFingerprintOnSuccess: true,
+            onProgress: (uploaded, total) => setUploadProgress(Math.round((uploaded / total) * 100)),
+            onError: reject,
+            onSuccess: () => resolve(),
+          });
+          upload.start();
+        });
         uploadedPath = path;
         publishedUrl = supabase.storage.from('public-videos').getPublicUrl(path).data.publicUrl;
       }
@@ -201,7 +230,7 @@ export function RoleDashboard({ user, onLogout }: { user: AppUser; onLogout: () 
       </section>
 
       <section className="grid gap-8 border-b border-zinc-800 pb-8 lg:grid-cols-2">
-        <form onSubmit={createVideo} className="space-y-3"><h2 className="text-lg font-semibold">Publicar vídeo</h2><input required className={inputClass} placeholder="Título" value={videoTitle} onChange={(event) => setVideoTitle(event.target.value)} /><label className="block space-y-1 text-sm text-slate-600">Carregar vídeo (máx. 100 MB)<input type="file" accept="video/mp4,video/webm,video/quicktime,video/ogg" key={videoFile?.name ?? "empty"} className={`${inputClass} file:mr-3 file:rounded-lg file:border-0 file:bg-violet-100 file:px-3 file:py-2 file:font-semibold file:text-violet-800`} onChange={(event) => setVideoFile(event.target.files?.[0] ?? null)} /></label><input type="url" className={inputClass} placeholder="Ou colar um link de vídeo" value={videoUrl} onChange={(event) => setVideoUrl(event.target.value)} /><select className={inputClass} value={videoCompany} onChange={(event) => setVideoCompany(event.target.value)}><option value="">Conteúdo geral</option>{companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}</select><label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={isShort} onChange={(event) => setIsShort(event.target.checked)} className="size-4 accent-violet-700" />Publicar também na aba Shorts</label><button className={primaryClass} disabled={busy}><Plus size={16} /> Publicar</button></form>
+        <form onSubmit={createVideo} className="space-y-3"><h2 className="text-lg font-semibold">Publicar vídeo</h2><input required className={inputClass} placeholder="Título" value={videoTitle} onChange={(event) => setVideoTitle(event.target.value)} /><label className="block space-y-1 text-sm text-slate-600">Carregar vídeo (máx. 100 MB)<input type="file" accept="video/mp4,video/webm,video/quicktime,video/ogg" className={`${inputClass} file:mr-3 file:rounded-lg file:border-0 file:bg-violet-100 file:px-3 file:py-2 file:font-semibold file:text-violet-800`} onChange={(event) => setVideoFile(event.target.files?.[0] ?? null)} /></label>{videoFile && <p className="text-xs text-slate-500">{videoFile.name} - {(videoFile.size / 1024 / 1024).toFixed(1)} MB</p>}{uploadProgress !== null && <div role="status" className="space-y-1 text-sm text-violet-800"><div className="flex justify-between"><span>A enviar o video...</span><span>{uploadProgress}%</span></div><progress className="w-full accent-violet-700" max={100} value={uploadProgress} /></div>}<input type="url" className={inputClass} placeholder="Ou colar um link de vídeo" value={videoUrl} onChange={(event) => setVideoUrl(event.target.value)} /><select className={inputClass} value={videoCompany} onChange={(event) => setVideoCompany(event.target.value)}><option value="">Conteúdo geral</option>{companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}</select><label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={isShort} onChange={(event) => setIsShort(event.target.checked)} className="size-4 accent-violet-700" />Publicar também na aba Shorts</label><button className={primaryClass} disabled={busy}><Plus size={16} /> {busy ? uploadProgress !== null ? `A enviar ${uploadProgress}%` : 'A publicar...' : 'Publicar'}</button></form>
         <GroupsPanel user={user} />
       </section>
 
